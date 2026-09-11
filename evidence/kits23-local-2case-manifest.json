@@ -1,0 +1,27 @@
+{
+  "schema_version": "shadowtrainer.manifest/v1",
+  "cases": [
+    {
+      "case_id": "case_00039",
+      "image": {
+        "source": "case_00039/imaging.nii.gz",
+        "size_bytes": 44953099
+      },
+      "label": {
+        "source": "case_00039/segmentation.nii.gz",
+        "size_bytes": 137515
+      }
+    },
+    {
+      "case_id": "case_00083",
+      "image": {
+        "source": "case_00083/imaging.nii.gz",
+        "size_bytes": 38295161
+      },
+      "label": {
+        "source": "case_00083/segmentation.nii.gz",
+        "size_bytes": 163323
+      }
+    }
+  ]
+}

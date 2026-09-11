@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shadow-trainer"
+version = "0.1.0"
+description = "Auditable, resource-aware local training for memory-constrained AI systems"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["psutil>=5.9"]
+
+[project.optional-dependencies]
+torch = ["torch>=2.2"]
+nifti = ["nibabel>=5.0"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+shadow-trainer = "shadow_trainer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
