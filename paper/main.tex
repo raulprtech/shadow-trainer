@@ -1,0 +1,297 @@
+\documentclass[10pt,twocolumn]{article}
+\usepackage[margin=0.72in]{geometry}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{url}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{amsmath}
+
+\title{Shadow Trainer: Auditable, Resource-Bounded Training Across GPU Memory, Host Memory, Disk, and Remote Storage}
+\author{Anonymous submission}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Training pipelines commonly assume that a dataset is locally available and
+that failures can be handled independently from memory management. These
+assumptions break on edge workstations, laboratory computers, and development
+laptops where GPU memory, host memory, disk capacity, and network data locality
+are all hard constraints. We present Shadow Trainer, a local runtime that
+admits a job only when its declared resource contract is safe, stages complete
+cases through an integrity-checked bounded cache, creates durable checkpoints
+that include optimizer and random-number-generator state, and emits a
+machine-verifiable execution record. A conservative policy keeps overlapped
+prefetch experimental until a paired equivalence gate passes. We report an
+initial implementation and physical validation on a laptop NVIDIA RTX 3050 Ti
+with 4 GiB of VRAM. A portable 3D CNN fixture completed 12 steps while respecting
+a 4 KiB cache, and a bounded NIfTI workload completed two real 3D image-label
+cases using $64^3$ patches. ResNet-18 and ResNet-50 topology adapters also
+completed short 2.5D proxy calibrations through the same public runtime. Peak reserved GPU memory was 22 and 64 MiB for the 3D runs, and 258 and 488 MiB for the ResNet calibrations. These measurements establish execution
+feasibility and artifact completeness, not throughput superiority or clinical
+quality. We also preserve a deterministic-CUDA failure and an incomplete
+prefetch experiment as negative evidence. The resulting system and evaluation
+protocol separate product readiness from optimization claims and provide a
+foundation for broader evaluation across models and storage conditions.
+\end{abstract}
+
+\section{Introduction}
+
+Commodity accelerators make local machine learning attractive for privacy,
+cost, iteration speed, and access. Their nominal compute capability, however,
+does not make a training job operationally safe. A workstation can have enough
+free GPU memory for a patch-based model yet insufficient disk space for a
+dataset replica, or sufficient disk capacity but insufficient host memory and
+swap headroom during decoding. Remote datasets add partial downloads,
+credentials, transient connectivity, and cache eviction to the failure model.
+Restarting after a failure can silently repeat samples or change the random
+sequence unless model state, optimizer state, data position, and random state
+are treated as one recovery unit.
+
+Existing systems address important slices of this problem. ZeRO-Offload moves
+model state and computation between GPU and CPU to enable much larger language
+models~\cite{zerooffload}. CheckFreq provides fine-grained DNN checkpointing
+and a resumable data iterator~\cite{checkfreq}. MONAI offers domain-specific
+medical-imaging pipelines and caching abstractions~\cite{monai}. Recent work on
+edge retraining streams optimizer state from storage to reduce unified-memory
+pressure~\cite{steer}. Shadow Trainer explores a different systems boundary:
+the admission, data-locality, recovery, and audit contract for a complete local
+job whose constraints span GPU memory, RAM, swap, disk, and a remote source.
+
+This paper makes four preliminary contributions:
+
+\begin{enumerate}
+  \item A versioned job contract and deterministic admission policy that reject
+  unsafe jobs before data transfer or GPU allocation.
+  \item An atomic, hash-validated case stager with a byte-accurate LRU cache and
+  explicit synchronous, prefetch, and conservative automatic modes.
+  \item A durable case-window recovery boundary that captures model, optimizer,
+  RNG, and dataset position together.
+  \item An evidence compiler that validates run bundles, derives metrics from
+  event logs, hashes their provenance, and excludes diagnostic or invalid runs
+  from numeric figures.
+\end{enumerate}
+
+Our initial experiments answer a deliberately narrow question: can the runtime
+enforce its basic contracts on physical 4-GiB hardware? They do not yet
+establish speedup, scale independence, full-state equivalence under prefetch,
+or clinical value.
+
+\section{Problem and threat model}
+
+We consider a single Linux or WSL host with one NVIDIA GPU. A job consumes a
+manifest of cases from either a local directory or an \texttt{rclone}-addressed
+source. The complete dataset may be larger than the allowed cache and available
+local disk. Training is organized into case windows, but the workload adapter
+controls model-specific tensor construction.
+
+The runtime must tolerate interruption at a committed window boundary,
+transient source failure, truncated transfer, hash mismatch, and resource
+shortage detected before execution. It must not promote a partial file into the
+cache, exceed the declared cache or combined-artifact budget, traverse outside
+the cache root, expose source credentials in reports, or claim a step that was
+not durably checkpointed.
+
+We do not defend against a malicious kernel, compromised Python process,
+incorrect manifest supplied by a trusted operator, or adversarial training
+code inside a workload adapter. Remote availability is not guaranteed. The
+current implementation also does not resize tensors or models automatically;
+it admits or rejects a declared workload and orchestrates its data and state.
+
+\section{Design}
+
+\subsection{Versioned resource contract}
+
+A \texttt{shadowtrainer.job/v1} document identifies the job and seed, output
+directory, data manifest and source, cache budget, disk floor, minimum free RAM
+and GPU memory, maximum swap use, artifact ceiling, execution strategy,
+training windows, and workload adapter. Byte counts are integers to avoid
+ambiguous unit parsing. Before creating a run directory, the planner captures
+GPU, driver, CUDA, cuDNN, RAM, swap, disk, Python, and dependency state. A
+rejected plan returns structured reasons without staging a case or constructing
+the model.
+
+The \texttt{auto} strategy is intentionally asymmetric. It selects synchronous
+staging while the equivalence gate for prefetch remains open. Users can request
+prefetch for controlled experiments, but the plan marks it experimental. This
+turns scientific uncertainty into executable product policy rather than a
+documentation caveat.
+
+\subsection{Atomic case staging}
+
+The manifest maps stable case identifiers to named files, sizes, and SHA-256
+digests. A local or remote source copies each file to a temporary path. Only a
+file with the expected size and digest is atomically renamed into the cache.
+The stager validates that resolved paths remain below the configured root and
+serializes cache mutation. LRU eviction considers complete cases rather than
+arbitrary file fragments. The current and next windows may be protected from
+eviction only if their combined declared size fits the cache.
+
+Synchronous mode stages the current window on demand. Prefetch mode uses one
+background worker for the next window and records launch, consumption, or skip
+events. It skips overlap when protecting both windows would exceed the byte
+budget. This policy prioritizes bounded behavior over nominal overlap.
+
+\subsection{Durable execution and recovery}
+
+After each case window, the runtime atomically writes a checkpoint containing a
+digest of the public job configuration, the next epoch and window, the global
+step, and workload-owned state. The provided PyTorch adapters include model,
+optimizer, Python RNG, CPU Torch RNG, and all CUDA RNG states. A resume operation
+requires a matching configuration digest. The event stream appends a checkpoint
+record only after the atomic save completes. The runtime then checks combined
+cache and artifact bytes against the declared ceiling.
+
+This boundary is coarser than CheckFreq's adaptive iteration checkpointing but
+also includes case-locality state. The design can later incorporate an adaptive
+frequency policy without changing the public recovery contract.
+
+\subsection{Workload adapters}
+
+The interface consists of \texttt{train\_case}, \texttt{checkpoint\_state}, and
+\texttt{restore}. Tiny3D is a deterministic portable CNN used for offline smoke
+tests. The NIfTI adapter memory-maps image and label volumes, selects a
+deterministic bounded patch, and materializes only that patch on the accelerator.
+Its compact four-class CNN is a systems probe rather than a competitive
+segmentation architecture.
+
+An initial CUDA path using a standard cross-entropy operation failed because
+the installed deterministic backward implementation was unavailable. We
+preserved that attempt and used the equivalent negative log-probability
+formulation based on \texttt{log\_softmax} and \texttt{gather} in a new run.
+This illustrates why failure evidence and environment capture are part of the
+runtime rather than post-hoc experiment notes.
+
+\subsection{Evidence compiler}
+
+Every run emits the public job, plan, environment, JSONL events, summary,
+checkpoint, and static HTML report. The evidence compiler requires the first
+five files, parses every event, derives metrics, and hashes names and contents
+into one SHA-256 provenance digest. A separate specification classifies each
+run as valid, engineering-only, diagnostic, invalid, or pending and states its
+permitted use. Numeric SVG figures include only valid records. Paths to source
+data and caches are not written to generated tables.
+
+\input{sections/correctness}
+
+\section{Evaluation methodology}
+
+We ask whether admission is safe (RQ1), cache occupancy is bounded (RQ2),
+recovery is idempotent (RQ3), prefetch preserves complete observable behavior
+(RQ4), and the contract generalizes across workloads (RQ5). The current
+evaluation addresses the first three partially and provides initial multi-workload
+support for the fifth.
+
+The physical host runs WSL2 with an NVIDIA RTX 3050 Ti Laptop GPU (4 GiB),
+driver 610.62, PyTorch 2.12.0 built for CUDA 13.0, and cuDNN 92000. P1 is a
+portable six-case fixture trained for two epochs. Its four-case cache forces
+eviction. P2 contains two KiTS23 NIfTI image-label pairs and uses one $64^3$
+patch per case, mixed precision, and a 128-MiB cache. Dataset content is not
+reported. D1 is the preserved failed form of P2 and is diagnostic only.
+
+Table~\ref{tab:initial} reports values derived from immutable JSON/JSONL
+artifacts. The bundle digests are generated alongside CSV, Markdown, and SVG
+outputs. Since P1 and P2 use different data and workloads, their times and
+memory values must not be interpreted as a comparison.
+
+\begin{table*}[t]
+\centering
+\caption{Initial physical evidence. All rows are independent feasibility runs, not comparative arms.}
+\label{tab:initial}
+\begin{tabular}{llrrrrrr}
+\toprule
+ID & Workload & Steps & Time (s) & Peak alloc. (MiB) & Peak reserved (MiB) & Cache used/budget & Transfer (MiB) \\
+\midrule
+P1 & Tiny3D & 12/12 & 2.316 & 16.48 & 22.00 & 4096/4096 B & 0.012 \\
+P2 & NIfTI patch 3D & 2/2 & 4.816 & 47.60 & 64.00 & 79.68/128 MiB & 36.68 \\
+P3 & ResNet-18 2.5D proxy & 4-step limit & 6.813 & 235.15 & 258.00 & 8/8 KiB & 0.008 \\
+P4 & ResNet-50 2.5D proxy & 2-step limit & 5.278 & 471.00 & 488.00 & 4/8 KiB & 0.004 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+All four valid runs completed their configured full or step-limited executions with finite losses and generated
+the required report and checkpoint artifacts. P1 reached exactly its cache
+budget and performed repeated whole-case eviction without exceeding it. P2 had
+one warm case and one cache miss; its measured staging time was 1.076 seconds.
+The evidence is sufficient for physical feasibility and bounded-cache claims.
+It is insufficient for throughput, capacity beyond local storage, or clinical
+segmentation claims.
+
+Unit and integration tests cover strict configuration parsing, manifest and
+path validation, atomic partial-transfer behavior, LRU enforcement, admission
+rejection, rclone success and timeout behavior, checkpoint resume without
+repeating confirmed step identifiers, report redaction, the NIfTI adapter, and
+evidence bundle integrity. The current suite contains 21 tests. A paired Tiny3D test also establishes exact model, optimizer, and RNG equality after interruption and resume.
+
+\subsection{Open prefetch gate}
+
+A historical paired protocol prepared independent caches and launched a
+synchronous arm intended to precede prefetch. The sync process completed 108 of
+144 steps and resumed at step 72, then a supervisor terminated it when physical
+disk free space fell below the 20-GiB floor. No OOM, non-finite value, or remote
+error was observed. The prefetch arm was not launched. Consequently there is
+no valid pair and no speedup or equivalence result. Production \texttt{auto}
+therefore remains synchronous.
+
+\input{sections/protocol}
+
+\section{Related work}
+
+Memory-efficient model training often focuses on model state. ZeRO-Offload
+partitions and offloads optimizer computation and state to CPU memory while
+minimizing GPU--CPU movement~\cite{zerooffload}. Out-of-core scheduling also
+moves model variables between GPU and CPU when they are not needed
+immediately~\cite{outofcore}. STEER targets edge retraining and streams
+optimizer state from fast storage~\cite{steer}. Shadow Trainer does not yet
+offer comparable model-state capacity. Its focus is a job-level contract across
+resources and dataset locality, so these techniques are complementary candidates
+for future workload adapters.
+
+Checkpointing research addresses recovery cost and data semantics. CheckFreq
+profiles checkpoint overhead, adapts frequency, pipelines persistence, and
+restores data-loader position~\cite{checkfreq}. Shadow Trainer currently uses a
+fixed case-window boundary, adds source/cache integrity and admission evidence,
+and treats the resulting bundle as an auditable product artifact.
+
+Medical-imaging frameworks such as MONAI provide transformations, architectures,
+and cache-oriented datasets on PyTorch~\cite{monai}. Shadow Trainer uses NIfTI
+as one physical validation workload but is domain-neutral. A fair evaluation
+must compare framework-local MONAI loading with Shadow Trainer's bounded remote
+staging rather than presenting the frameworks as substitutes.
+
+\section{Limitations and next experiments}
+
+The study has one hardware host, four successful short runs, and no statistically
+repeated performance experiment. The compact NIfTI model does not establish
+medical utility. GPU memory values are workload observations, not maximum
+supported capacity. The current cache trace does not yet demonstrate a remote
+dataset larger than all available local storage. Recovery tests prove step-id idempotence and bitwise final model, optimizer, and
+RNG equality for Tiny3D, but a general claim requires equivalent paired tests
+for the NIfTI and ResNet adapters. Prefetch has not passed its gate.
+
+The next evaluation uses separate processes and independently prepared caches
+for sync and prefetch, with identical manifest, order, seed, checkpoint, CUDA,
+cuDNN, and driver. Cold and warm runs remain separate. The runtime will stop
+before preparation unless physical disk has at least 30 GiB free, retain a
+20-GiB floor, and cap combined cache and artifacts at 5 GiB. ResNet18, ResNet50,
+and a 2.5D adapter will test generality. A framework-local PyTorch/MONAI arm
+will quantify overhead. Only a pair with identical observable state can support
+an overlap-performance claim.
+
+\section{Conclusion}
+
+Shadow Trainer makes resource limits, dataset locality, recovery, and evidence
+validity explicit parts of a local training job. Initial 4-GiB GPU runs show
+that the implementation can execute a synthetic 3D CNN, bounded real NIfTI
+patch training, and ResNet-18/50 2.5D proxy calibrations while producing complete, traceable artifacts. More importantly,
+the same policy prevents an unfinished prefetch experiment from becoming a
+product speedup claim. The remaining work is empirical: establish paired
+equivalence, evaluate larger-than-cache remote data, add workload families, and
+measure overhead across repeated hardware runs.
+
+\bibliographystyle{plain}
+\bibliography{references}
+\end{document}

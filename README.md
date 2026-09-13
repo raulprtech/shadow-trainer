@@ -41,10 +41,15 @@ Install the package without duplicating PyTorch:
     shadow-trainer run JOB.json
     shadow-trainer resume RUN_DIR
     shadow-trainer report RUN_DIR
+    shadow-trainer benchmark research/evidence-spec.json --output-dir research/generated
     shadow-trainer demo --output-dir demo-output
 
 Use --cpu only for portable smoke tests. The Circuito 14 evidence run must use
 the physical NVIDIA GPU.
+
+The public workload adapters are `tiny3d`, `nifti_patch3d`, and `resnet2p5d`
+(ResNet-18/50 topology). The latter is a systems calibration adapter, not a
+medical-quality benchmark.
 
 ## Job contract
 

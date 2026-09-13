@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="356">
+<rect width="100%" height="100%" fill="#fbfcfe"/>
+<text x="24" y="38" font-family="sans-serif" font-size="22" font-weight="700">Observed runtime (independent runs; not a speedup comparison)</text>
+<text x="24" y="92" font-family="sans-serif" font-size="15">Portable Tiny3D</text>
+<rect x="250" y="72" width="183.59" height="28" rx="4" fill="#3157d5"/>
+<text x="441.59" y="92" font-family="monospace" font-size="14">2.32 s</text>
+<text x="24" y="156" font-family="sans-serif" font-size="15">KiTS23 two-case 3D</text>
+<rect x="250" y="136" width="381.75" height="28" rx="4" fill="#3157d5"/>
+<text x="639.75" y="156" font-family="monospace" font-size="14">4.82 s</text>
+<text x="24" y="220" font-family="sans-serif" font-size="15">ResNet18 2.5D calibration</text>
+<rect x="250" y="200" width="540.00" height="28" rx="4" fill="#3157d5"/>
+<text x="798.00" y="220" font-family="monospace" font-size="14">6.81 s</text>
+<text x="24" y="284" font-family="sans-serif" font-size="15">ResNet50 2.5D calibration</text>
+<rect x="250" y="264" width="418.34" height="28" rx="4" fill="#3157d5"/>
+<text x="676.34" y="284" font-family="monospace" font-size="14">5.28 s</text>
+</svg>

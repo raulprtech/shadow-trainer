@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="620" viewBox="0 0 1120 620">
+  <rect width="1120" height="620" fill="#f7f9fc"/>
+  <text x="50" y="52" font-family="sans-serif" font-size="30" font-weight="700" fill="#17223b">Shadow Trainer resource contract</text>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#56657f"/></marker></defs>
+  <g font-family="sans-serif" text-anchor="middle">
+    <rect x="50" y="105" width="200" height="90" rx="14" fill="#ffffff" stroke="#3157d5" stroke-width="3"/>
+    <text x="150" y="140" font-size="20" font-weight="700">Remote / local source</text><text x="150" y="170" font-size="16">manifest + hashes</text>
+    <rect x="320" y="105" width="200" height="90" rx="14" fill="#ffffff" stroke="#3157d5" stroke-width="3"/>
+    <text x="420" y="140" font-size="20" font-weight="700">Bounded disk cache</text><text x="420" y="170" font-size="16">atomic LRU cases</text>
+    <rect x="590" y="105" width="200" height="90" rx="14" fill="#ffffff" stroke="#3157d5" stroke-width="3"/>
+    <text x="690" y="140" font-size="20" font-weight="700">Host memory</text><text x="690" y="170" font-size="16">RAM + swap guard</text>
+    <rect x="860" y="105" width="200" height="90" rx="14" fill="#ffffff" stroke="#3157d5" stroke-width="3"/>
+    <text x="960" y="140" font-size="20" font-weight="700">GPU</text><text x="960" y="170" font-size="16">VRAM guard + workload</text>
+    <line x1="250" y1="150" x2="315" y2="150" stroke="#56657f" stroke-width="3" marker-end="url(#arrow)"/>
+    <line x1="520" y1="150" x2="585" y2="150" stroke="#56657f" stroke-width="3" marker-end="url(#arrow)"/>
+    <line x1="790" y1="150" x2="855" y2="150" stroke="#56657f" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="165" y="285" width="240" height="100" rx="14" fill="#eaf0ff" stroke="#3157d5" stroke-width="2"/>
+    <text x="285" y="322" font-size="21" font-weight="700">Admission policy</text><text x="285" y="351" font-size="16">admit / reject before work</text>
+    <rect x="440" y="285" width="240" height="100" rx="14" fill="#eaf0ff" stroke="#3157d5" stroke-width="2"/>
+    <text x="560" y="322" font-size="21" font-weight="700">Durable runtime</text><text x="560" y="351" font-size="16">sync / experimental prefetch</text>
+    <rect x="715" y="285" width="240" height="100" rx="14" fill="#eaf0ff" stroke="#3157d5" stroke-width="2"/>
+    <text x="835" y="322" font-size="21" font-weight="700">Evidence compiler</text><text x="835" y="351" font-size="16">events + digest + reports</text>
+    <line x1="405" y1="335" x2="435" y2="335" stroke="#56657f" stroke-width="3" marker-end="url(#arrow)"/>
+    <line x1="680" y1="335" x2="710" y2="335" stroke="#56657f" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="245" y="475" width="630" height="90" rx="14" fill="#173b73"/>
+    <text x="560" y="510" font-size="21" font-weight="700" fill="#ffffff">Auditable recovery boundary</text>
+    <text x="560" y="540" font-size="16" fill="#ffffff">model + optimizer + RNG + dataset position + environment</text>
+    <line x1="560" y1="385" x2="560" y2="470" stroke="#56657f" stroke-width="3" marker-end="url(#arrow)"/>
+  </g>
+</svg>

@@ -14,6 +14,7 @@ from .errors import ShadowTrainerError
 from .reporting import render_report
 from .resources import print_snapshot, snapshot
 from .runtime import inspect_job, resume_job, run_job
+from .scientific import build_evidence_bundle
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -38,6 +39,9 @@ def _parser() -> argparse.ArgumentParser:
     demo = commands.add_parser("demo", help="run the portable local 3D-CNN demo")
     demo.add_argument("--output-dir", required=True, type=Path)
     demo.add_argument("--cpu", action="store_true", help="allow a CPU-only demonstration")
+    benchmark = commands.add_parser("benchmark", help="build canonical scientific evidence from audited runs")
+    benchmark.add_argument("evidence_spec", type=Path)
+    benchmark.add_argument("--output-dir", required=True, type=Path)
     return parser
 
 
@@ -84,6 +88,10 @@ def main(argv: list[str] | None = None) -> int:
             result = run_demo(args.output_dir, use_cuda=not args.cpu)
             print(json.dumps(result, indent=2, sort_keys=True))
             print(f"Report: {(args.output_dir / 'run' / 'report.html').resolve()}")
+            return 0
+        if args.command == "benchmark":
+            payload = build_evidence_bundle(args.evidence_spec, args.output_dir)
+            print(json.dumps(payload, indent=2, sort_keys=True))
             return 0
     except (ShadowTrainerError, OSError, ValueError, RuntimeError) as exc:
         _print_error(exc)

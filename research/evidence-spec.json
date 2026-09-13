@@ -1,0 +1,45 @@
+{
+  "schema_version": "shadowtrainer.evidence-spec/v1",
+  "records": [
+    {
+      "id": "P1",
+      "label": "Portable Tiny3D",
+      "run_dir": "../demo-output-physical-v2/run",
+      "classification": "valid",
+      "permitted_use": "Physical GPU feasibility, bounded cache, and artifact completeness",
+      "notes": "RTX 3050 Ti; auto conservatively selected synchronous staging."
+    },
+    {
+      "id": "P2",
+      "label": "KiTS23 two-case 3D",
+      "run_dir": "../evidence/kits23-local-2case-run-v2",
+      "classification": "valid",
+      "permitted_use": "Systems feasibility for bounded NIfTI patch training; not clinical efficacy",
+      "notes": "Two real image-label pairs; random patches cannot support a segmentation-quality claim."
+    },
+    {
+      "id": "P3",
+      "label": "ResNet18 2.5D calibration",
+      "run_dir": "workspace/run-resnet18",
+      "classification": "valid",
+      "permitted_use": "Physical workload-adapter feasibility only; not comparative performance",
+      "notes": "Four-step deterministic proxy-slice calibration on RTX 3050 Ti."
+    },
+    {
+      "id": "P4",
+      "label": "ResNet50 2.5D calibration",
+      "run_dir": "workspace/run-resnet50",
+      "classification": "valid",
+      "permitted_use": "Physical workload-adapter feasibility only; not comparative performance",
+      "notes": "Two-step deterministic proxy-slice calibration on RTX 3050 Ti."
+    },
+    {
+      "id": "D1",
+      "label": "Unsupported deterministic loss",
+      "run_dir": "../evidence/kits23-local-2case-run",
+      "classification": "diagnostic",
+      "permitted_use": "Failure analysis only",
+      "notes": "Preserved failed attempt; excluded from numeric publication figures."
+    }
+  ]
+}

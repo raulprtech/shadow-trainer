@@ -1,0 +1,73 @@
+\section{Protocol for comparative evaluation}
+
+A performance evaluation must separate three effects that are easily conflated:
+capacity, runtime overhead, and latency hiding. Shadow Trainer may enable a job
+under a disk ceiling even when it is slower than framework-local loading. A
+prefetch arm may reduce exposed I/O time while leaving total runtime unchanged
+because training dominates. Conversely, a warm source or filesystem cache may
+appear to accelerate prefetch even when overlap provides no benefit. We define
+the following protocol to prevent these cases from becoming one aggregate
+``speedup'' number.
+
+\subsection{Arms and controlled variables}
+
+The framework-local arm reads a fully local dataset without Shadow Trainer and
+establishes orchestration overhead. The synchronous arm uses atomic staging and
+the bounded cache. The prefetch arm changes only whether the next case window is
+materialized concurrently. Paired sync and prefetch processes use the same
+manifest bytes, case order, seed, initial checkpoint, model options, training
+steps, cache capacity, disk floor, driver, CUDA, cuDNN, and PyTorch version.
+Each arm starts in a new process to avoid allocator and library state leaking
+between measurements.
+
+Cold and warm conditions are separate populations. A cold run starts from an
+independently prepared cache state and records every source byte. A warm run is
+allowed to reuse the declared case cache but must identify its initial contents.
+Operating-system page-cache state is difficult to control safely on a shared
+workstation; it is therefore reported as a limitation rather than manipulated
+with privileged cache-dropping commands.
+
+\subsection{Measurements}
+
+Primary capacity outcomes are admission, completion, peak allocated and reserved
+VRAM, process RSS, swap use, maximum cache occupancy, combined artifact bytes,
+and minimum observed disk headroom. Primary recovery outcomes are lost or
+repeated step identifiers and equality of final model, optimizer, RNG, and data
+position. Performance outcomes are end-to-end time, staging time, bytes moved,
+cache hits and misses, exposed I/O stall, steps per second, and GPU utilization.
+
+Every reported performance cell requires at least three independent processes;
+five are preferred for short workloads. We report individual observations,
+median, interquartile range, and a bootstrap confidence interval for the paired
+difference. A mean alone is not used for small, skewed I/O samples. Hardware
+telemetry sampling must be identical across arms and sufficiently light that its
+overhead is either measured or held constant.
+
+\subsection{Exactness gate}
+
+Latency hiding is eligible for a performance comparison only after the complete
+observable result passes an exactness audit. The audit checks ordered case and
+step identifiers, finite losses, final model and optimizer tensors, RNG states,
+checkpoint position, manifest digest, and boundary hashes. If deterministic
+algorithms cannot make a particular kernel bitwise stable, the protocol must
+predeclare numerical tolerances and justify them; a tolerance cannot be selected
+after observing the difference. The current product takes the stricter position:
+prefetch remains experimental because the full pair has not completed.
+
+\subsection{Capacity experiment}
+
+The principal paper result should use a remote dataset whose declared size
+exceeds the cache and the disk allocation available to the job. Capacity is
+demonstrated only if all requested cases are processed, maximum cache and
+artifact occupancy remain within contract, every promoted file passes integrity
+validation, and the final disk floor is respected. Comparing total dataset size
+with physical disk size is unnecessary and potentially misleading; the relevant
+quantity is the storage allocation made available under the experimental
+contract.
+
+The same experiment should be repeated for NIfTI 3D, ResNet-18, ResNet-50, and
+a real adjacent-slice 2.5D pipeline. The current proxy ResNet runs validate the
+adapter boundary and topology memory footprint but do not replace real decoding,
+augmentation, or data-loader behavior. Together, the capacity and overhead arms
+would determine whether the unified contract provides a useful capability and
+what performance price it imposes.

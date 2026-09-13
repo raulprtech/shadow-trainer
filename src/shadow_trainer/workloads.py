@@ -123,4 +123,7 @@ def create_workload(kind: str, seed: int, options: dict[str, Any]) -> Workload:
     if kind == "nifti_patch3d":
         from .nifti_workload import NiftiPatch3DWorkload
         return NiftiPatch3DWorkload(seed, options)
+    if kind == "resnet2p5d":
+        from .resnet_workload import ResNet2p5DWorkload
+        return ResNet2p5DWorkload(seed, options)
     raise ConfigurationError(f"unsupported workload: {kind}")

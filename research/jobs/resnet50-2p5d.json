@@ -1,0 +1,28 @@
+{
+  "schema_version": "shadowtrainer.job/v1",
+  "job_id": "resnet50-2p5d-calibration",
+  "seed": 1401,
+  "output_dir": "../workspace/run-resnet50",
+  "strategy": "sync",
+  "data": {
+    "manifest": "../workspace/manifest.json",
+    "source": {"type": "local", "root": "../workspace/source"},
+    "cache_dir": "../workspace/cache-resnet50",
+    "validate_nifti": false
+  },
+  "resources": {
+    "cache_bytes": 8192,
+    "disk_floor_bytes": 10737418240,
+    "min_available_ram_bytes": 1073741824,
+    "max_swap_bytes": 2147483648,
+    "min_gpu_free_bytes": 1073741824,
+    "require_cuda": true,
+    "artifact_budget_bytes": 1073741824,
+    "disk_check_path": "/home/raulprtech/shadow-trainer/research"
+  },
+  "training": {"epochs": 1, "cases_per_window": 2, "max_steps": 2},
+  "workload": {"type": "resnet2p5d", "options": {
+    "device": "cuda", "depth": 50, "input_size": 64,
+    "in_channels": 3, "classes": 4, "base_width": 64
+  }}
+}

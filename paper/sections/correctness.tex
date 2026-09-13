@@ -1,0 +1,68 @@
+\section{Correctness invariants}
+
+Shadow Trainer is intended to make operational guarantees testable. The
+implementation is therefore organized around invariants rather than a target
+throughput number.
+
+\paragraph{Admission non-interference.}
+A rejected job must not materialize source objects, instantiate its workload,
+or allocate accelerator state. The planner operates only on parsed configuration
+and a resource snapshot. This ordering matters when admission protects a nearly
+full disk: probing feasibility by first creating a cache would itself consume
+the resource being protected. The physical low-disk observation in this study
+returned \texttt{disk\_headroom} before staging. Unit tests separately force
+GPU and disk rejection paths.
+
+\paragraph{Atomic promotion.}
+A source object becomes cache-visible only after transfer to a temporary name,
+size validation, optional format validation, digest verification, and atomic
+rename. A timeout, process exit, truncated object, or mismatched digest can
+leave reconstructible temporary data but cannot produce a valid cache entry.
+The cache state records complete cases, and a hit is accepted only for files
+that still meet the manifest contract. This is stronger than assuming that a
+successful copy command implies a usable training sample.
+
+\paragraph{Bounded residency.}
+Before admitting a new case, the stager computes the required bytes and evicts
+least-recently-used unprotected cases until the postcondition fits the declared
+budget. A case larger than the entire cache is rejected rather than partially
+resident. During prefetch the current and future windows are both protected;
+overlap is skipped when their declared sum exceeds the cache. At a durable
+boundary the runtime also measures the checkpoint and all run artifacts together
+with cache occupancy and compares the result with the job-level artifact ceiling.
+
+The current implementation checks this combined ceiling at window boundaries,
+not continuously while a large checkpoint temporary file is being written.
+Atomic save protects checkpoint validity, but a future version should reserve
+the predicted temporary-file size before writing so that instantaneous disk
+occupancy is covered by the same hard invariant.
+
+\paragraph{Monotone committed progress.}
+The checkpoint stores the next epoch and window, not merely the most recent
+global step. On resume, a configuration digest prevents accidental continuation
+under a different manifest, resource contract, workload, or output identity.
+The event log can contain multiple process-start records, but confirmed training
+steps must remain monotone and unique. The paired Tiny3D test now compares final
+model tensors, optimizer state, Python RNG state, and Torch RNG state between an
+uninterrupted execution and a one-step interruption followed by resume. Equality
+is established for this adapter only; the same proof obligation remains for
+NIfTI and ResNet.
+
+\paragraph{Evidence non-escalation.}
+Completing a process is not sufficient to authorize every statement about it.
+Each evidence record has a classification and permitted use independent of the
+run's status. A successful two-case medical-image run can support systems
+feasibility but not clinical quality. A failed run may explain a design change
+but cannot enter a numeric figure. A complete sync arm without its paired
+prefetch arm cannot support a speedup. The compiler enforces the simplest of
+these rules mechanically by selecting only \texttt{valid} records for SVG
+figures; the claims ledger constrains interpretation further.
+
+These invariants expose remaining proof gaps. The file and cache layer has
+failure-injection tests, whereas remote recovery across an actual connectivity
+loss is pending. The runtime restores workload state exactly for Tiny3D, whereas
+data transforms and asynchronous workers may add nondeterminism in larger
+adapters. Finally, the resource snapshot is a point observation. An external
+process can consume memory or disk after admission, so long jobs also require
+runtime guards and a clearly reported guard stop rather than relying exclusively
+on the initial plan.
