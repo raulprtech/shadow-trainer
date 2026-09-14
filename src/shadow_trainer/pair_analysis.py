@@ -63,7 +63,8 @@ def summarize_pair_matrix(matrix_path: str | Path, output_dir: str | Path) -> di
         audit = pair.get("audit")
         sync = _finite(pair.get("sync_seconds"))
         prefetch = _finite(pair.get("prefetch_seconds"))
-        exact = isinstance(audit, dict) and audit.get("status") == "exact"
+        exact = (isinstance(audit, dict) and audit.get("status") == "exact"
+                 and audit.get("performance_comparison_eligible") is True)
         eligible = exact and sync is not None and prefetch is not None and sync > 0 and prefetch > 0
         if eligible:
             groups[(workload, condition)].append({"repetition": repetition,
@@ -76,6 +77,7 @@ def summarize_pair_matrix(matrix_path: str | Path, output_dir: str | Path) -> di
     expected_workloads = protocol.get("workloads") if isinstance(protocol.get("workloads"), list) else []
     expected_conditions = protocol.get("conditions") if isinstance(protocol.get("conditions"), list) else []
     expected_repetitions = protocol.get("repetitions") if isinstance(protocol.get("repetitions"), int) else 0
+    timing_field = protocol.get("timing_field")
     expected_groups = {(workload, condition) for workload in expected_workloads for condition in expected_conditions}
     expected_repetition_ids = set(range(1, expected_repetitions + 1))
     coverage_complete = (bool(expected_groups) and set(groups) == expected_groups
@@ -83,7 +85,8 @@ def summarize_pair_matrix(matrix_path: str | Path, output_dir: str | Path) -> di
                                  == expected_repetition_ids
                                  and len(groups[key]) == expected_repetitions
                                  for key in expected_groups))
-    matrix_complete = matrix.get("status") == "success" and not excluded and coverage_complete
+    matrix_complete = (matrix.get("status") == "success" and not excluded
+                       and coverage_complete and timing_field == "execution_seconds")
     summaries = []
     for group_index, ((workload, condition), rows) in enumerate(sorted(groups.items())):
         ratios = [row["ratio"] for row in rows]
@@ -107,7 +110,7 @@ def summarize_pair_matrix(matrix_path: str | Path, output_dir: str | Path) -> di
         "schema_version": SUMMARY_SCHEMA,
         "source_matrix_status": matrix.get("status", "unknown"),
         "complete_matrix": complete,
-        "policy": "timing summaries require exact audit and at least three pairs per group",
+        "policy": "timing summaries require execution_seconds, exact audit, and complete protocol coverage",
         "groups": summaries,
         "excluded_pairs": excluded,
         "all_performance_claims_eligible": (complete and not excluded and bool(summaries)

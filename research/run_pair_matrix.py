@@ -118,7 +118,8 @@ def main() -> int:
     session.mkdir(parents=True, exist_ok=False)
     result = {"schema_version": SCHEMA, "started_at": time.time(),
               "preflight": preflight, "protocol": {"workloads": list(templates),
-              "conditions": ["cold", "warm"], "repetitions": REPETITIONS}, "pairs": [], "status": "running"}
+              "conditions": ["cold", "warm"], "repetitions": REPETITIONS,
+              "timing_field": "execution_seconds"}, "pairs": [], "status": "running"}
     atomic_json(session / "matrix.json", result)
     try:
         for workload, template_path in templates.items():
@@ -136,8 +137,8 @@ def main() -> int:
                                        jobs["prefetch"].parent / "run", audit_path)
                     entry = {"workload": workload, "condition": condition,
                              "repetition": repetition, "audit": audit,
-                             "sync_seconds": summaries["sync"]["duration_seconds"],
-                             "prefetch_seconds": summaries["prefetch"]["duration_seconds"]}
+                             "sync_seconds": summaries["sync"]["execution_seconds"],
+                             "prefetch_seconds": summaries["prefetch"]["execution_seconds"]}
                     entry["sync_metrics"] = collect_arm_metrics(jobs["sync"].parent / "run")
                     entry["prefetch_metrics"] = collect_arm_metrics(jobs["prefetch"].parent / "run")
                     if audit["status"] == "exact":

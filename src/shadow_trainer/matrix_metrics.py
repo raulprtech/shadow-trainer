@@ -35,6 +35,7 @@ def collect_arm_metrics(run_dir: str | Path) -> dict[str, Any]:
     cache = summary.get("cache") if isinstance(summary.get("cache"), dict) else {}
     return {
         "duration_seconds": summary.get("duration_seconds"),
+        "execution_seconds": summary.get("execution_seconds"),
         "steps": summary.get("global_step"),
         "peak_gpu_allocated_bytes": int(max(allocated)) if allocated else None,
         "peak_gpu_reserved_bytes": int(max(reserved)) if reserved else None,

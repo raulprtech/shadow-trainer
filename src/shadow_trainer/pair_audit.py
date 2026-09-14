@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 from pathlib import Path
 from typing import Any
 
 from .errors import IntegrityError
 from .events import atomic_json
+from .state_digest import state_digest
 
 REQUIRED = ("job.json", "plan.json", "environment.json", "events.jsonl",
             "summary.json", "latest.checkpoint.pt")
@@ -70,15 +70,28 @@ def _manifest_digest(job: dict[str, Any]) -> str:
 
 
 def _environment_signature(environment: dict[str, Any]) -> dict[str, Any]:
+    host = environment.get("host", {})
     torch = environment.get("torch", {})
     nvidia = environment.get("nvidia", {})
     devices = nvidia.get("devices", [])
-    device = devices[0] if devices else {}
+    identities = [{
+        "index": device.get("index"),
+        "name": device.get("name"),
+        "memory_total_bytes": device.get("memory_total_bytes"),
+        "driver_version": device.get("driver_version"),
+    } for device in devices if isinstance(device, dict)]
     return {
-        "torch": torch.get("version"), "cuda": torch.get("cuda_build"),
-        "cudnn": torch.get("cudnn_version"), "gpu": device.get("name"),
-        "gpu_total_bytes": device.get("memory_total_bytes"),
-        "driver": device.get("driver_version"),
+        "host": {"kernel": host.get("kernel"), "platform": host.get("platform"),
+                 "python": host.get("python")},
+        "dependencies": environment.get("dependencies", {}),
+        "torch": {"version": torch.get("version"),
+                  "cuda_available": torch.get("cuda_available"),
+                  "cuda_build": torch.get("cuda_build"),
+                  "cudnn_version": torch.get("cudnn_version"),
+                  "device_count": torch.get("device_count"),
+                  "device_name": torch.get("device_name")},
+        "nvidia_available": nvidia.get("available"),
+        "devices": identities,
     }
 
 
@@ -86,37 +99,6 @@ def _step_signature(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{key: row[key] for key in SEMANTIC_STEP_KEYS if key in row}
             for row in events if row.get("kind") == "train_step"]
 
-
-def _state_digest(value: Any) -> str:
-    import torch
-    digest = hashlib.sha256()
-
-    def visit(item: Any) -> None:
-        if isinstance(item, torch.Tensor):
-            tensor = item.detach().cpu().contiguous()
-            digest.update(b"tensor\0" + str(tensor.dtype).encode() + b"\0")
-            digest.update(json.dumps(list(tensor.shape)).encode() + b"\0")
-            digest.update(tensor.reshape(-1).view(torch.uint8).numpy().tobytes())
-        elif isinstance(item, dict):
-            digest.update(b"dict\0")
-            for key in sorted(item, key=lambda x: repr(x)):
-                visit(key)
-                visit(item[key])
-        elif isinstance(item, (list, tuple)):
-            digest.update(type(item).__name__.encode() + b"\0")
-            for child in item:
-                visit(child)
-        elif isinstance(item, float):
-            if not math.isfinite(item):
-                digest.update(repr(item).encode())
-            else:
-                digest.update(item.hex().encode())
-            digest.update(b"\0")
-        else:
-            digest.update(type(item).__name__.encode() + b":" + repr(item).encode() + b"\0")
-
-    visit(value)
-    return digest.hexdigest()
 
 
 def audit_pair(sync_dir: str | Path, prefetch_dir: str | Path,
@@ -135,11 +117,22 @@ def audit_pair(sync_dir: str | Path, prefetch_dir: str | Path,
                              == _environment_signature(prefetch["environment"]))
     checks["success"] = (sync["summary"].get("status") == "success"
                          and prefetch["summary"].get("status") == "success")
+    sync_ready = [row for row in sync["events"] if row.get("kind") == "workload_ready"]
+    prefetch_ready = [row for row in prefetch["events"] if row.get("kind") == "workload_ready"]
+    checks["fresh_runs"] = (len(sync_ready) == len(prefetch_ready) == 1
+                            and sync_ready[0].get("resume") is False
+                            and prefetch_ready[0].get("resume") is False)
+    checks["initial_workload_state"] = (checks["fresh_runs"]
+        and sync_ready[0].get("workload_state_sha256")
+        == prefetch_ready[0].get("workload_state_sha256"))
+    checks["deterministic_algorithms"] = (checks["fresh_runs"]
+        and sync_ready[0].get("deterministic_algorithms") is True
+        and prefetch_ready[0].get("deterministic_algorithms") is True)
     checks["steps"] = _step_signature(sync["events"]) == _step_signature(prefetch["events"])
     for key in ("next_epoch", "next_window", "global_step"):
         checks[f"checkpoint_{key}"] = sync["checkpoint"].get(key) == prefetch["checkpoint"].get(key)
-    sync_digest = _state_digest(sync["checkpoint"].get("workload"))
-    prefetch_digest = _state_digest(prefetch["checkpoint"].get("workload"))
+    sync_digest = state_digest(sync["checkpoint"].get("workload"))
+    prefetch_digest = state_digest(prefetch["checkpoint"].get("workload"))
     checks["workload_state"] = sync_digest == prefetch_digest
     failed = sorted(key for key, passed in checks.items() if not passed)
     result = {
@@ -149,9 +142,13 @@ def audit_pair(sync_dir: str | Path, prefetch_dir: str | Path,
         "failed_checks": failed,
         "sync": {"run_id": sync["job"].get("job_id"),
                  "duration_seconds": sync["summary"].get("duration_seconds"),
+                 "execution_seconds": sync["summary"].get("execution_seconds"),
+                 "initial_workload_state_sha256": sync_ready[0].get("workload_state_sha256") if sync_ready else None,
                  "workload_state_sha256": sync_digest},
         "prefetch": {"run_id": prefetch["job"].get("job_id"),
                      "duration_seconds": prefetch["summary"].get("duration_seconds"),
+                     "execution_seconds": prefetch["summary"].get("execution_seconds"),
+                     "initial_workload_state_sha256": prefetch_ready[0].get("workload_state_sha256") if prefetch_ready else None,
                      "workload_state_sha256": prefetch_digest},
         "performance_comparison_eligible": not failed,
     }

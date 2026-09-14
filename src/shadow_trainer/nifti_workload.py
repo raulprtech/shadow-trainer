@@ -38,6 +38,7 @@ class NiftiPatch3DWorkload:
         if device_name == "cuda" and not torch.cuda.is_available():
             raise DependencyError("nifti_patch3d requested CUDA but CUDA is unavailable")
         self.device = torch.device(device_name)
+        random.seed(seed)
         torch.manual_seed(seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(seed)

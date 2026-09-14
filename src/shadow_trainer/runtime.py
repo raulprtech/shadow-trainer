@@ -13,6 +13,7 @@ from typing import Any
 from .config import JobConfig
 from .errors import AdmissionError, IntegrityError
 from .events import EventLog, atomic_json
+from .state_digest import state_digest
 from .policy import Plan, build_plan
 from .reporting import redact, render_report
 from .resources import snapshot
@@ -119,6 +120,15 @@ def run_job(
             }
         )
 
+    import torch
+
+    events.emit({
+        "kind": "workload_ready",
+        "resume": bool(resume_dir),
+        "deterministic_algorithms": torch.are_deterministic_algorithms_enabled(),
+        "workload_state_sha256": state_digest(workload.checkpoint_state()),
+    })
+
     summary: dict[str, Any] = {
         "schema_version": "shadowtrainer.summary/v1",
         "job_id": config.job_id,
@@ -136,6 +146,7 @@ def run_job(
         else None
     )
     pending: tuple[int, int, list[str], Future] | None = None
+    execution_started = time.perf_counter()
     try:
         stop = False
         for epoch in range(next_epoch, config.training.epochs):
@@ -249,6 +260,7 @@ def run_job(
                 "status": "success" if complete else "interrupted",
                 "finished_at": time.time(),
                 "duration_seconds": time.time() - started,
+                "execution_seconds": time.perf_counter() - execution_started,
                 "global_step": global_step,
                 "expected_steps": expected_steps,
                 "cache": stager.status(),
@@ -261,6 +273,7 @@ def run_job(
                 "status": "failed",
                 "finished_at": time.time(),
                 "duration_seconds": time.time() - started,
+                "execution_seconds": time.perf_counter() - execution_started,
                 "global_step": global_step,
                 "error": {"type": type(exc).__name__, "message": str(exc)},
             }

@@ -132,6 +132,7 @@ class ResNet2p5DWorkload:
         if requested == "cuda" and not torch.cuda.is_available():
             raise DependencyError("resnet2p5d requested CUDA but CUDA is unavailable")
         self.device = torch.device(requested)
+        random.seed(seed)
         torch.manual_seed(seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(seed)

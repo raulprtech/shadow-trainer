@@ -44,6 +44,7 @@ class Tiny3DWorkload:
         if requested_device == "cuda" and not torch.cuda.is_available():
             raise DependencyError("tiny3d requested CUDA but CUDA is unavailable")
         self.device = torch.device(requested_device)
+        random.seed(seed)
         torch.manual_seed(seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(seed)

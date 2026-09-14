@@ -6,7 +6,7 @@ from shadow_trainer.matrix_metrics import collect_arm_metrics
 def test_collect_arm_metrics(tmp_path):
     run = tmp_path / "run"
     run.mkdir()
-    (run / "summary.json").write_text(json.dumps({"duration_seconds": 3.0,
+    (run / "summary.json").write_text(json.dumps({"duration_seconds": 3.0, "execution_seconds": 2.5,
         "global_step": 2, "artifact_bytes": 90,
         "cache": {"occupancy_bytes": 40, "budget_bytes": 64}}))
     rows = [
@@ -23,4 +23,5 @@ def test_collect_arm_metrics(tmp_path):
     assert metrics["peak_gpu_reserved_bytes"] == 16
     assert metrics["bytes_transferred"] == 20
     assert metrics["cache_hits"] == metrics["cache_misses"] == 1
+    assert metrics["execution_seconds"] == 2.5
     assert metrics["artifact_bytes"] == 90

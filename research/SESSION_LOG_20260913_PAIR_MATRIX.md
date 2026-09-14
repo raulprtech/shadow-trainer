@@ -29,14 +29,18 @@ The auditor compared:
 
 - manifest canonical digest;
 - seed, training and workload configuration;
+- fresh-process initialized workload hash and deterministic-algorithm status;
 - Torch, CUDA/cuDNN, GPU and driver signature where present;
 - ordered epoch, window, step, case, loss and workload metrics;
 - checkpoint epoch, window and global step;
 - model, optimizer and RNG state digest.
+- monotonic `execution_seconds` from ready state through final checkpoint,
+  separate from whole-process duration.
 
-A separate negative test modified one checkpoint parameter and the auditor
-returned `diverged` with `workload_state` as the failed check. The complete
-suite now contains 29 passing tests.
+The Tiny3D audit test now launches sync and prefetch in independent Python
+interpreters. Controlled mutations of the initialized-state event and one final
+checkpoint parameter separately return `diverged` at the corresponding gate.
+The complete suite now contains 29 passing tests.
 
 All four source manifests were also verified read-only before launch: the NIfTI
 manifest contains two cases totaling 83,549,098 bytes, while each Tiny3D and

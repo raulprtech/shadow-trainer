@@ -56,6 +56,7 @@ After a complete successful matrix, compile timing results with:
 
     shadow-trainer summarize-pairs MATRIX.json --output-dir pair-summary
 
-The compiler emits JSON, CSV, and Markdown only after checking every exact pair.
+The compiler emits JSON, CSV, and Markdown only after checking every exact pair. It accepts only matrices that explicitly declare
+`execution_seconds` as their timing field.
 Any missing cell, divergence, invalid duration, or non-success matrix suppresses
 all performance-claim eligibility.

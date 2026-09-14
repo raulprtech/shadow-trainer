@@ -1,10 +1,13 @@
 import json
+import os
+import subprocess
+import sys
+from pathlib import Path
 
 import torch
 
 from shadow_trainer.config import JobConfig
 from shadow_trainer.pair_audit import audit_pair
-from shadow_trainer.runtime import run_job
 
 from conftest import write_case_source
 
@@ -31,12 +34,29 @@ def test_exact_pair_and_mutated_checkpoint(tmp_path):
     source, manifest = write_case_source(tmp_path)
     sync = _config(tmp_path, source, manifest, "sync")
     prefetch = _config(tmp_path, source, manifest, "prefetch")
-    run_job(sync)
-    run_job(prefetch)
+    environment = os.environ.copy()
+    source_root = str(Path(__file__).resolve().parents[1] / "src")
+    environment["PYTHONPATH"] = source_root + os.pathsep + environment.get("PYTHONPATH", "")
+    for config in (sync, prefetch):
+        completed = subprocess.run(
+            [sys.executable, "-m", "shadow_trainer", "run", str(config.config_path)],
+            text=True, capture_output=True, env=environment, timeout=120,
+        )
+        assert completed.returncode == 0, completed.stderr
     output = tmp_path / "audit.json"
     exact = audit_pair(sync.output_dir, prefetch.output_dir, output)
     assert exact["status"] == "exact"
     assert exact["performance_comparison_eligible"] is True
+    events_path = prefetch.output_dir / "events.jsonl"
+    rows = [json.loads(line) for line in events_path.read_text().splitlines()]
+    ready = next(row for row in rows if row.get("kind") == "workload_ready")
+    original_initial_hash = ready["workload_state_sha256"]
+    ready["workload_state_sha256"] = "0" * 64
+    events_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+    initial_diverged = audit_pair(sync.output_dir, prefetch.output_dir)
+    assert initial_diverged["failed_checks"] == ["initial_workload_state"]
+    ready["workload_state_sha256"] = original_initial_hash
+    events_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
     checkpoint_path = prefetch.output_dir / "latest.checkpoint.pt"
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     first = next(iter(checkpoint["workload"]["model"].values()))
