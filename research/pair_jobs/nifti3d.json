@@ -1,0 +1,14 @@
+{
+  "schema_version": "shadowtrainer.job/v1", "job_id": "template", "seed": 20260910,
+  "output_dir": "unused", "strategy": "sync",
+  "data": {"manifest": "../../evidence/kits23-local-2case-manifest.json",
+    "source": {"type": "local", "root": "/home/raulprtech/stream-hot-kits-mini/cache_drive_2gib"},
+    "cache_dir": "unused", "validate_nifti": true},
+  "resources": {"cache_bytes": 134217728, "disk_floor_bytes": 21474836480,
+    "disk_check_path": "/mnt/c", "min_available_ram_bytes": 2684354560,
+    "max_swap_bytes": 2147483648, "min_gpu_free_bytes": 1879048192,
+    "require_cuda": true, "artifact_budget_bytes": 268435456},
+  "training": {"epochs": 1, "cases_per_window": 1},
+  "workload": {"type": "nifti_patch3d", "options": {"device": "cuda",
+    "patch_size": 64, "classes": 4, "base_channels": 4, "amp": true}}
+}

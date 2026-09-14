@@ -44,9 +44,9 @@ under a different manifest, resource contract, workload, or output identity.
 The event log can contain multiple process-start records, but confirmed training
 steps must remain monotone and unique. The paired Tiny3D test now compares final
 model tensors, optimizer state, Python RNG state, and Torch RNG state between an
-uninterrupted execution and a one-step interruption followed by resume. Equality
-is established for this adapter only; the same proof obligation remains for
-NIfTI and ResNet.
+uninterrupted execution and a one-step interruption followed by resume. Equality is established for Tiny3D resume. Separate small CPU fixtures pass the
+sync/prefetch state audit for NIfTI and ResNet, while physical CUDA equivalence
+remains open.
 
 \paragraph{Evidence non-escalation.}
 Completing a process is not sufficient to authorize every statement about it.

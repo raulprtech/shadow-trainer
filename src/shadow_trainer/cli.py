@@ -11,6 +11,7 @@ from . import __version__
 from .config import JobConfig
 from .demo import run_demo
 from .errors import ShadowTrainerError
+from .pair_audit import audit_pair
 from .reporting import render_report
 from .resources import print_snapshot, snapshot
 from .runtime import inspect_job, resume_job, run_job
@@ -42,6 +43,10 @@ def _parser() -> argparse.ArgumentParser:
     benchmark = commands.add_parser("benchmark", help="build canonical scientific evidence from audited runs")
     benchmark.add_argument("evidence_spec", type=Path)
     benchmark.add_argument("--output-dir", required=True, type=Path)
+    pair = commands.add_parser("audit-pair", help="audit exact sync/prefetch semantic equivalence")
+    pair.add_argument("sync_run", type=Path)
+    pair.add_argument("prefetch_run", type=Path)
+    pair.add_argument("--output", type=Path)
     return parser
 
 
@@ -93,6 +98,10 @@ def main(argv: list[str] | None = None) -> int:
             payload = build_evidence_bundle(args.evidence_spec, args.output_dir)
             print(json.dumps(payload, indent=2, sort_keys=True))
             return 0
+        if args.command == "audit-pair":
+            payload = audit_pair(args.sync_run, args.prefetch_run, args.output)
+            print(json.dumps(payload, indent=2, sort_keys=True))
+            return 0 if payload["status"] == "exact" else 4
     except (ShadowTrainerError, OSError, ValueError, RuntimeError) as exc:
         _print_error(exc)
         return 1

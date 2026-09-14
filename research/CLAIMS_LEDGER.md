@@ -12,7 +12,8 @@ blocked unless the listed evidence exists and matches its permitted use.
 | Resume does not repeat confirmed step identifiers. | Integration test and Stage38 sync boundary. | Supported narrowly. | “Observed/tested step-position idempotence at durable boundaries.” |
 | Tiny3D resume is bitwise identical to uninterrupted execution. | Paired model, optimizer and RNG tensor comparison. | Supported for Tiny3D only. | “Tiny3D paired test reproduces model, optimizer and RNG state exactly.” |
 | Resume equivalence generalizes to every adapter. | Paired NIfTI and ResNet state comparisons. | Not yet supported. | Do not claim. |
-| Prefetch is equivalent to sync. | Complete Stage38 pair. | Pending. | “Prefetch remains experimental.” |
+| Small CPU sync/prefetch fixtures are semantically exact. | Pair-audit tests for Tiny3D, NIfTI, ResNet18 and ResNet50. | Supported only for small CPU fixtures. | “The audit harness passes controlled CPU fixtures.” |
+| Prefetch is equivalent to sync on the physical CUDA workload. | Complete physical matrix and Stage38 pair. | Pending. | “Prefetch remains experimental.” |
 | Prefetch accelerates training. | Repeated valid paired cold/warm runs. | Not supported. | Do not claim. |
 | Shadow Trainer trains a dataset larger than all local storage. | Complete remote streamed experiment with occupancy trace. | Pending. | Current claim is limited to bounded staging mechanics. |
 | Shadow Trainer improves clinical segmentation. | Held-out patient-level evaluation. | Not supported or in MVP scope. | Do not claim. |

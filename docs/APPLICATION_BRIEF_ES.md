@@ -38,7 +38,7 @@ Trainer no se presenta como dispositivo ni solución clínica.
 - Caché física de 128 MiB con 83,549,098 bytes ocupados.
 - Guarda de disco observando el espacio real de C: mediante /mnt/c.
 - Calibraciones físicas ResNet18 y ResNet50 2.5D proxy con 258 y 488 MiB de VRAM reservada.
-- Suite automatizada: 21 pruebas aprobadas, incluida equivalencia exacta de reanudación para Tiny3D.
+- Suite automatizada: 25 pruebas aprobadas, incluida equivalencia exacta de reanudación para Tiny3D.
 
 Estas cifras describen el MVP compacto. Las calibraciones ResNet son pruebas
 de integración, no comparaciones de velocidad o calidad predictiva. Los resultados de STU-Net del

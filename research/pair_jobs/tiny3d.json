@@ -1,0 +1,13 @@
+{
+  "schema_version": "shadowtrainer.job/v1", "job_id": "template", "seed": 1401,
+  "output_dir": "unused", "strategy": "sync",
+  "data": {"manifest": "../workspace/manifest.json",
+    "source": {"type": "local", "root": "../workspace/source"},
+    "cache_dir": "unused", "validate_nifti": false},
+  "resources": {"cache_bytes": 8192, "disk_floor_bytes": 21474836480,
+    "disk_check_path": "/mnt/c", "min_available_ram_bytes": 1073741824,
+    "max_swap_bytes": 2147483648, "min_gpu_free_bytes": 1073741824,
+    "require_cuda": true, "artifact_budget_bytes": 67108864},
+  "training": {"epochs": 2, "cases_per_window": 1},
+  "workload": {"type": "tiny3d", "options": {"device": "cuda", "input_shape": [1, 8, 8, 8]}}
+}
