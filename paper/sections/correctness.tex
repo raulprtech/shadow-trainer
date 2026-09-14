@@ -7,7 +7,8 @@ throughput number.
 \paragraph{Admission non-interference.}
 A rejected job must not materialize source objects, instantiate its workload,
 or allocate accelerator state. The planner operates only on parsed configuration
-and a resource snapshot. This ordering matters when admission protects a nearly
+and a resource snapshot. Disk admission reserves the declared floor plus
+the complete combined cache/artifact budget, rather than cache bytes alone. This ordering matters when admission protects a nearly
 full disk: probing feasibility by first creating a cache would itself consume
 the resource being protected. The physical low-disk observation in this study
 returned \texttt{disk\_headroom} before staging. Unit tests separately force
@@ -29,7 +30,9 @@ budget. A case larger than the entire cache is rejected rather than partially
 resident. During prefetch the current and future windows are both protected;
 overlap is skipped when their declared sum exceeds the cache. At a durable
 boundary the runtime also measures the checkpoint and all run artifacts together
-with cache occupancy and compares the result with the job-level artifact ceiling.
+with cache occupancy and compares the result with the job-level artifact ceiling. Before each checkpoint it rechecks free space against the floor plus the
+remaining artifact reservation, and checks the bare floor again after atomic
+promotion.
 
 The current implementation checks this combined ceiling at window boundaries,
 not continuously while a large checkpoint temporary file is being written.

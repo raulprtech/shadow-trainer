@@ -21,6 +21,9 @@ The matrix runner is configured for:
 - exact audit after every pair;
 - immediate stop on divergence;
 - 20-GiB physical C: floor and 3-GiB session ceiling.
+- per-arm admission reserves the full artifact budget above the floor;
+- runtime rechecks the remaining reservation before and the floor after every
+  checkpoint.
 
 ## Safe semantic verification
 

@@ -28,6 +28,9 @@ def test_disk_rejection_is_deterministic(tmp_path):
     plan = build_plan(config, environment(disk_free=120))
     assert not plan.admitted
     assert plan.reasons == ("disk_headroom",)
+    required = config.resources.disk_floor_bytes + config.resources.artifact_budget_bytes
+    assert not build_plan(config, environment(disk_free=required - 1)).admitted
+    assert build_plan(config, environment(disk_free=required)).admitted
 
 
 def test_cuda_rejection(tmp_path):

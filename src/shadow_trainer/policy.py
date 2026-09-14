@@ -41,7 +41,7 @@ def build_plan(config: JobConfig, environment: dict) -> Plan:
     torch = environment["torch"]
     free_gpu = gpu_free_bytes(environment)
 
-    if disk["free_bytes"] < config.resources.disk_floor_bytes + config.resources.cache_bytes:
+    if disk["free_bytes"] < config.resources.disk_floor_bytes + config.resources.artifact_budget_bytes:
         reasons.append("disk_headroom")
     if memory["available_bytes"] < config.resources.min_available_ram_bytes:
         reasons.append("available_ram")

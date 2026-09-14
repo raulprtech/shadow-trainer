@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
@@ -47,6 +48,16 @@ def _directory_bytes(path: Path) -> int:
     if not path.exists():
         return 0
     return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
+
+
+def _assert_disk_floor(config: JobConfig, reserve_bytes: int = 0) -> None:
+    anchor = config.resources.disk_check_path
+    while not anchor.exists() and anchor != anchor.parent:
+        anchor = anchor.parent
+    free = shutil.disk_usage(anchor).free
+    required = config.resources.disk_floor_bytes + reserve_bytes
+    if free < required:
+        raise IntegrityError(f"runtime disk reservation violated: {free} < {required}")
 
 
 def _atomic_torch_save(path: Path, payload: dict) -> None:
@@ -222,7 +233,15 @@ def run_job(
                     "global_step": global_step,
                     "workload": workload.checkpoint_state(),
                 }
+                current_artifact_bytes = (
+                    _directory_bytes(run_dir) + stager.status()["occupancy_bytes"]
+                )
+                remaining_reservation = max(
+                    0, config.resources.artifact_budget_bytes - current_artifact_bytes
+                )
+                _assert_disk_floor(config, remaining_reservation)
                 _atomic_torch_save(checkpoint_path, checkpoint_payload)
+                _assert_disk_floor(config)
                 events.emit(
                     {
                         "kind": "checkpoint",
