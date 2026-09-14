@@ -165,10 +165,13 @@ def run_job(
             for window_index in range(window_start, len(batches)):
                 current = batches[window_index]
                 if pending and pending[0:3] == (epoch, window_index, current):
+                    prefetch_wait_started = time.perf_counter()
                     staged_paths = pending[3].result()
-                    events.emit(
-                        {"kind": "prefetch_consumed", "epoch": epoch, "window": window_index}
-                    )
+                    prefetch_wait_seconds = time.perf_counter() - prefetch_wait_started
+                    events.emit({
+                        "kind": "prefetch_consumed", "epoch": epoch,
+                        "window": window_index, "wait_seconds": prefetch_wait_seconds,
+                    })
                     pending = None
                 else:
                     staged_paths = stager.stage_batch(current)

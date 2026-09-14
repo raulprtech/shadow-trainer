@@ -24,6 +24,8 @@ The matrix runner is configured for:
 - per-arm admission reserves the full artifact budget above the floor;
 - runtime rechecks the remaining reservation before and the floor after every
   checkpoint.
+- telemetry separates foreground staging, background staging, exposed prefetch
+  wait, peak cache occupancy, peak VRAM, transferred bytes and artifact bytes.
 
 ## Safe semantic verification
 

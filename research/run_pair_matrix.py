@@ -159,7 +159,9 @@ def main() -> int:
                         raise RuntimeError(f"pair_diverged:{workload}:{condition}:r{repetition}")
         result["status"] = "success"
     except Exception as exc:
-        result["status"] = "guard_stopped" if "floor" in str(exc) or "ceiling" in str(exc) else "failed"
+        result["status"] = ("guard_stopped" if any(
+            marker in str(exc) for marker in ("floor", "ceiling", "reservation")
+        ) else "failed")
         result["error"] = {"type": type(exc).__name__, "message": str(exc)}
         atomic_json(session / "matrix.json", result)
         raise

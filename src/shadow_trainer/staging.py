@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -194,7 +195,7 @@ class CaseStager:
         os.replace(temporary, self.state_path)
 
     def _event(self, payload: dict) -> None:
-        row = {"timestamp": time.time(), **payload}
+        row = {"timestamp": time.time(), "worker": threading.current_thread().name, **payload}
         with self.events_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(row, sort_keys=True) + "\n")
         if self.event_callback:
@@ -276,7 +277,10 @@ class CaseStager:
                 started = time.perf_counter()
                 if case_id in state["cases"] and case_dir.is_dir():
                     state["cases"][case_id]["last_access"] = time.time()
-                    self._event({"event": "cache_hit", "case_id": case_id})
+                    self._event({"event": "cache_hit", "case_id": case_id,
+                                 "seconds": time.perf_counter() - started,
+                                 "occupancy_bytes": self._occupancy(state),
+                                 "budget_bytes": self.budget_bytes})
                     paths.append(case_dir)
                     continue
                 evicted = self._evict(record.total_bytes, state, protected)
@@ -307,6 +311,8 @@ class CaseStager:
                         "bytes": record.total_bytes,
                         "seconds": elapsed,
                         "evicted": evicted,
+                        "occupancy_bytes": self._occupancy(state),
+                        "budget_bytes": self.budget_bytes,
                     }
                 )
                 paths.append(case_dir)

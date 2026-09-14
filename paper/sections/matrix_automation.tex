@@ -15,10 +15,13 @@ Every pair passes through a semantic auditor before its times are eligible for
 analysis. Timing uses a monotonic \texttt{execution\_seconds} interval from
 the ready workload state through the final training checkpoint, excluding host
 inspection and model initialization; whole-process duration remains separate.
+Per-arm metrics also distinguish foreground and background staging service time,
+the wait exposed when a prefetched window is consumed, final and peak cache
+occupancy, transferred bytes, peak VRAM, and artifact bytes.
 The auditor compares the canonical manifest, job seed and workload
 configuration, software and accelerator signature, a fresh-process
-initialized-state hash, deterministic-algorithm status, ordered per-step trace, checkpoint position, and structured
-hashes of model, optimizer, and Python,
+initialized-state hash, deterministic-algorithm status, ordered per-step trace,
+checkpoint position, and structured hashes of model, optimizer, and Python,
 Torch, and CUDA RNG state. A divergence stops the matrix immediately. The
 summary compiler is stricter still: it suppresses all timing statistics unless
 the matrix reports success, contains every protocol cell and repetition, and
