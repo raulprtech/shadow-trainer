@@ -1,7 +1,7 @@
 {
   "schema_version": "shadowtrainer.job/v1", "job_id": "template", "seed": 20260910,
   "output_dir": "unused", "strategy": "sync",
-  "data": {"manifest": "../../evidence/kits23-local-2case-manifest.json",
+  "data": {"manifest": "kits23-local-2case-sha256.json",
     "source": {"type": "local", "root": "/home/raulprtech/stream-hot-kits-mini/cache_drive_2gib"},
     "cache_dir": "unused", "validate_nifti": true},
   "resources": {"cache_bytes": 134217728, "disk_floor_bytes": 21474836480,

@@ -6,7 +6,7 @@
 | Tecnología y diferenciación | 25% | Runtime, contratos, staging, guardas, resume, reportes y diagrama público | Revisión preliminar de IP |
 | Problema y mercado | 20% | Hipótesis AI/edge definida | Cinco entrevistas y síntesis sin datos inventados |
 | Impacto en Jalisco | 20% | Vínculo CINVESTAV y perfiles técnicos requeridos | Identificar tres organizaciones objetivo y ruta de piloto |
-| Progreso y validación | 10% | Demo GPU, NIfTI real, ResNet18/50 2.5D proxy, 29 pruebas y evidencia histórica | Video corto y Stage38 o clasificación final de prefetch |
+| Progreso y validación | 10% | Demo GPU, NIfTI real, ResNet18/50 2.5D proxy, 30 pruebas y evidencia histórica | Video corto y Stage38 o clasificación final de prefetch |
 
 ## Regla de evidencia
 

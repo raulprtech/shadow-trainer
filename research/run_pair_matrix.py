@@ -15,6 +15,7 @@ from shadow_trainer.config import JobConfig
 from shadow_trainer.events import atomic_json
 from shadow_trainer.matrix_metrics import collect_arm_metrics
 from shadow_trainer.pair_audit import audit_pair
+from shadow_trainer.source_verification import verify_local_manifest
 from shadow_trainer.staging import CaseStager, LocalSource, load_manifest
 
 SCHEMA = "shadowtrainer.pair-matrix/v1"
@@ -104,12 +105,20 @@ def main() -> int:
     }
     preflight = {"physical_free_bytes": _physical_free(), "required_floor_bytes": DISK_FLOOR,
                  "session_ceiling_bytes": SESSION_CEILING, "workloads": list(templates)}
-    print(json.dumps(preflight, indent=2))
     try:
         _guard()
-    except RuntimeError as exc:
-        print(str(exc), file=sys.stderr)
+        verified = {}
+        for workload, template_path in templates.items():
+            template = _absolute_template(template_path)
+            verified[workload] = verify_local_manifest(
+                template["data"]["manifest"], template["data"]["source"]["root"]
+            )
+        preflight["manifests"] = verified
+    except Exception as exc:
+        print(json.dumps(preflight, indent=2))
+        print(f"preflight_failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
+    print(json.dumps(preflight, indent=2))
     if args.preflight_only:
         return 0
     if args.output_dir is None:

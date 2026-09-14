@@ -1,0 +1,31 @@
+{
+  "schema_version": "shadowtrainer.manifest/v1",
+  "cases": [
+    {
+      "case_id": "case_00039",
+      "image": {
+        "source": "case_00039/imaging.nii.gz",
+        "size_bytes": 44953099,
+        "sha256": "ba31bba727acdff50aa43244d17872c75cdf69ad6dc493e4a52c36c44e953e3c"
+      },
+      "label": {
+        "source": "case_00039/segmentation.nii.gz",
+        "size_bytes": 137515,
+        "sha256": "23ff24cc9d8f425a5c46db6735a3d919b1c907bff9559c129a3713eb830ebb36"
+      }
+    },
+    {
+      "case_id": "case_00083",
+      "image": {
+        "source": "case_00083/imaging.nii.gz",
+        "size_bytes": 38295161,
+        "sha256": "7748e2dc080c6f9df479e7db2b03d17c7b32e62ee081741fd5d0d0786cc1fa23"
+      },
+      "label": {
+        "source": "case_00083/segmentation.nii.gz",
+        "size_bytes": 163323,
+        "sha256": "a53607023a9e5316dba7f4db377fb13849facc090130ede81980a1c10fc56097"
+      }
+    }
+  ]
+}

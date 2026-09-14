@@ -40,12 +40,14 @@ The auditor compared:
 The Tiny3D audit test now launches sync and prefetch in independent Python
 interpreters. Controlled mutations of the initialized-state event and one final
 checkpoint parameter separately return `diverged` at the corresponding gate.
-The complete suite now contains 29 passing tests.
+The complete suite now contains 30 passing tests.
 
-All four source manifests were also verified read-only before launch: the NIfTI
-manifest contains two cases totaling 83,549,098 bytes, while each Tiny3D and
-ResNet manifest contains six cases totaling 12,288 bytes; every declared size
-and SHA-256 digest matched.
+The read-only verifier exposed that the historical NIfTI manifest declared sizes
+but no SHA-256 values. That file remains unchanged. The matrix now references a
+new canonical manifest with four digests. Verification passes for its two cases
+(totaling 83,549,098 bytes) and for each six-case Tiny3D/ResNet profile
+(totaling 12,288 bytes). The canonical NIfTI manifest digest is
+`1b37437c33aebb608f4994927ef1b3955ee3f61a09aceffd57f31c66df472254`.
 
 ## Claim boundary
 

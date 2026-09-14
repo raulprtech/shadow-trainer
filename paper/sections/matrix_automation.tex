@@ -7,7 +7,8 @@ requests three sync/prefetch repetitions per cell. Each arm runs in a new
 Python process with an independent cache and output directory, yielding 48
 processes in a complete matrix. The runner checks the physical Windows-volume
 free-space floor before session creation, before and after warm-cache
-preparation, and before each arm. It also enforces a 3-GiB ceiling on the
+preparation, and before each arm. After the disk gate, it validates every
+source-object size and SHA-256 before session creation. It also enforces a 3-GiB ceiling on the
 matrix session artifacts.
 
 Every pair passes through a semantic auditor before its times are eligible for

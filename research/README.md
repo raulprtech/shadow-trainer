@@ -49,6 +49,9 @@ If the physical preflight fails on disk headroom, follow the non-deleting
 The guarded matrix runner launches four workloads, two cache conditions, three
 repetitions, and two strategies as 48 independent Python processes. Run the
 read-only resource gate first:
+After the disk gate passes, the same preflight verifies the size and SHA-256 of
+every local source object before creating a session.
+
 
     PYTHONPATH=src python research/run_pair_matrix.py --preflight-only
 
