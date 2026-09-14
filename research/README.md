@@ -43,6 +43,9 @@ permitted.
 
 ## Paired physical matrix
 
+If the physical preflight fails on disk headroom, follow the non-deleting
+`research/PHYSICAL_DISK_RECOVERY.md` procedure before retrying.
+
 The guarded matrix runner launches four workloads, two cache conditions, three
 repetitions, and two strategies as 48 independent Python processes. Run the
 read-only resource gate first:

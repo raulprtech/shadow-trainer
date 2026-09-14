@@ -6,8 +6,11 @@ The 48-process physical matrix was not launched. Its preflight observed
 5,355,749,376 free bytes on C: against the unchanged 21,474,836,480-byte
 runtime floor and returned exit code 2 before creating a session directory.
 After CPU integration verification, C: had 5,110,845,440 free bytes. A final
-preflight observed 6,466,846,720 free bytes and remained blocked. No GPU
-pair, timing comparison, or Stage38 arm is valid from this block.
+preflight observed 6,466,846,720 free bytes and remained blocked. The final
+Windows inventory reported 3,910,651,904 free bytes; the fluctuation does not
+change the decision. No GPU
+pair, timing comparison, or Stage38 arm is valid from this block. The non-deleting recovery procedure is recorded in
+`research/PHYSICAL_DISK_RECOVERY.md`.
 
 The matrix runner is configured for:
 
