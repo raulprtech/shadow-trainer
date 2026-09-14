@@ -26,9 +26,9 @@ under a paired protocol?
 | --- | --- | --- | --- |
 | H1 | Admission deterministically prevents resource-floor violations. | Unit rejection tests plus physical low-disk rejection before staging. | Partially supported; physical rejection observed, consolidated run pending. |
 | H2 | Peak cache occupancy never exceeds its configured budget. | Dataset larger than cache; occupancy trace; zero partial promotions. | Supported for MVP fixture; larger remote validation pending. |
-| H3 | Resume reproduces uninterrupted state for the same job. | Paired checkpoint hashes, step ids, losses and final state. | Bitwise model, optimizer and RNG equality supported for Tiny3D; other adapters pending. |
+| H3 | Resume reproduces uninterrupted state for the same job. | Paired checkpoint hashes, step ids, losses and final state. | Exact small CPU pairs cover all four adapters; repeated physical CUDA equivalence remains pending. |
 | H4 | Prefetch is exactly equivalent to sync and reduces exposed I/O time. | Valid paired Stage38 run with independent caches and identical seeds. | Open; no claim permitted. |
-| H5 | Runtime contracts transfer across workload families. | At least three adapters using the public API. | Tiny3D and NIfTI validated; ResNet/2.5D pending. |
+| H5 | Runtime contracts transfer across workload families. | At least three adapters using the public API. | Supported at physical feasibility level by P1--P4; representative training remains pending. |
 
 ## Baselines
 
@@ -46,14 +46,16 @@ contracts and evaluate any executable baseline whose environment is compatible.
 
 ## Required run matrix
 
-| Family | Data | Mode | Repetitions | Metrics | Gate |
-| --- | --- | --- | ---: | --- | --- |
-| Tiny3D | Local fixture > cache | sync | 5 cold + 5 warm | limits, time, eviction, hashes | MVP regression |
-| NIfTI 3D | KiTS23 staged cases | sync | 3 cold + 3 warm | VRAM, RSS, cache, I/O, finite loss | Physical feasibility |
-| NIfTI 3D | Same paired manifest | prefetch | 3 cold + 3 warm | same plus exact final hashes | Stage38 |
-| ResNet18 | Fixed 2D/2.5D fixture | sync | 3 | VRAM, throughput, checkpoint | Generality |
-| ResNet50 | Fixed 2D/2.5D fixture | sync | 3 | VRAM, throughput, checkpoint | Generality |
-| Failure injection | Synthetic rclone | sync | one per failure | rejection point, partial files, recovery | Safety |
+| Family | Data | Conditions | Strategies | Repetitions per cell | Gate |
+| --- | --- | --- | --- | ---: | --- |
+| Tiny3D | Local fixture greater than cache | cold + fully warm | sync + prefetch | 3 paired | Regression and equivalence |
+| NIfTI 3D | Fixed verified two-case manifest | cold + fully warm | sync + prefetch | 3 paired | Physical CUDA equivalence |
+| ResNet18 | Fixed verified six-case fixture | cold + fully warm | sync + prefetch | 3 paired | Generality |
+| ResNet50 | Fixed verified six-case fixture | cold + fully warm | sync + prefetch | 3 paired | Generality |
+| Failure injection | Synthetic rclone | n/a | sync | one per failure | Safety |
+
+The paired matrix therefore launches 48 new workload processes. Failure injection
+is a separate integration suite and is not mixed into timing analysis.
 
 Each arm runs in a fresh process. Paired arms use identical manifests, order,
 seeds, initial checkpoints and environment metadata. Cold and warm runs are
@@ -65,21 +67,29 @@ reported separately; they are never averaged together.
 - If equivalence fails, retain `auto -> sync` and publish the negative result.
 - Do not report speedup from any pair with different input cache warmth.
 - Do not report clinical Dice from training patches.
-- Stop before preparation when physical C: has less than 30 GiB free; retain a
-  20-GiB runtime floor and a 5-GiB combined cache/artifact ceiling.
+- Stop before session creation, warm-cache preparation, or an arm when physical
+  C: has less than the immutable 20-GiB floor; retain a 3-GiB matrix-session ceiling.
 
 ## Exact next execution
 
-After compacting WSL and confirming at least 30 GiB free on `/mnt/c`:
+After compacting WSL and confirming at least 20 GiB free on `/mnt/c`:
 
-    cd /home/raulprtech/stream-hot-kits-mini
-    /home/raulprtech/clinical_core/.venv/bin/python experiments/stage38_r3/prepare.py
-    /home/raulprtech/clinical_core/.venv/bin/python experiments/stage38_r3/run_arm.py sync
+    cd /home/raulprtech/shadow-trainer
+    PYTHONPATH=src /home/raulprtech/clinical_core/.venv/bin/python \
+      research/run_pair_matrix.py --preflight-only
 
-Inspect the sync summary and guard reasons. Only if it is complete:
+Only after a successful preflight, create a fresh matrix directory:
 
-    /home/raulprtech/clinical_core/.venv/bin/python experiments/stage38_r3/run_arm.py prefetch
-    /home/raulprtech/clinical_core/.venv/bin/python experiments/stage38_r3/audit.py
+    PYTHONPATH=src /home/raulprtech/clinical_core/.venv/bin/python \
+      research/run_pair_matrix.py \
+      --output-dir research/workspace/pair-matrix-physical-r1
 
-Then rebuild the product evidence bundle and update the manuscript. Never
-reuse a partial r2 run or reduce the disk floor to force admission.
+If and only if `matrix.json` ends in `success` with every pair exact:
+
+    shadow-trainer summarize-pairs \
+      research/workspace/pair-matrix-physical-r1/matrix.json \
+      --output-dir research/workspace/pair-matrix-physical-r1/analysis
+
+The summary compiler suppresses timings for any missing, divergent, or invalid
+pair. Stage38 remains a separate large-case confirmation after this matrix. Never
+reuse a partial output directory or reduce the disk floor to force admission.

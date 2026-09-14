@@ -16,7 +16,7 @@ todavía aceleración general, equivalencia universal ni utilidad clínica.
 | P2 — NIfTI 3D | 2/2 casos, 4.816 s, pérdidas finitas, 64 MiB de VRAM reservada. | Viabilidad de entrenamiento por parches con datos 3D reales. |
 | P3 — ResNet18 2.5D | 4 pasos limitados, pérdidas finitas, 258 MiB de VRAM reservada. | Viabilidad del adaptador y de una segunda familia de carga. |
 | P4 — ResNet50 2.5D | 2 pasos limitados, pérdidas finitas, 488 MiB de VRAM reservada. | Viabilidad del adaptador; no comparación de rendimiento. |
-| Pruebas automatizadas | 25 pruebas después de incorporar el recolector científico. | Contratos de configuración, staging, admisión, reanudación y reporte. |
+| Pruebas automatizadas | 29 pruebas después de incorporar el recolector científico. | Contratos de configuración, staging, admisión, reanudación y reporte. |
 
 Los valores de P1 y P2 se regeneran desde artefactos JSON/JSONL y quedan
 asociados a un SHA-256. KiTS23 se usa como carga técnica pública, no como

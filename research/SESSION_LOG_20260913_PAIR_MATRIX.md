@@ -5,7 +5,8 @@
 The 48-process physical matrix was not launched. Its preflight observed
 5,355,749,376 free bytes on C: against the unchanged 21,474,836,480-byte
 runtime floor and returned exit code 2 before creating a session directory.
-After CPU integration verification, C: had 5,110,845,440 free bytes. No GPU
+After CPU integration verification, C: had 5,110,845,440 free bytes. A final
+preflight observed 6,466,846,720 free bytes and remained blocked. No GPU
 pair, timing comparison, or Stage38 arm is valid from this block.
 
 The matrix runner is configured for:
@@ -32,7 +33,12 @@ The auditor compared:
 
 A separate negative test modified one checkpoint parameter and the auditor
 returned `diverged` with `workload_state` as the failed check. The complete
-suite now contains 25 passing tests.
+suite now contains 29 passing tests.
+
+All four source manifests were also verified read-only before launch: the NIfTI
+manifest contains two cases totaling 83,549,098 bytes, while each Tiny3D and
+ResNet manifest contains six cases totaling 12,288 bytes; every declared size
+and SHA-256 digest matched.
 
 ## Claim boundary
 

@@ -13,6 +13,7 @@ from pathlib import Path
 
 from shadow_trainer.config import JobConfig
 from shadow_trainer.events import atomic_json
+from shadow_trainer.matrix_metrics import collect_arm_metrics
 from shadow_trainer.pair_audit import audit_pair
 from shadow_trainer.staging import CaseStager, LocalSource, load_manifest
 
@@ -56,6 +57,7 @@ def _absolute_template(path: Path) -> dict:
 
 def _prepare_job(template: dict, session: Path, workload: str, condition: str,
                  repetition: int, strategy: str) -> Path:
+    _guard(session)
     raw = json.loads(json.dumps(template))
     identity = f"{workload}-{condition}-r{repetition}-{strategy}"
     raw["job_id"] = identity
@@ -75,6 +77,7 @@ def _prepare_job(template: dict, session: Path, workload: str, condition: str,
         CaseStager(config.data.manifest, config.data.cache_dir,
                    config.resources.cache_bytes,
                    LocalSource(Path(config.data.source.root))).stage_batch(list(records))
+    _guard(session)
     return job
 
 
@@ -114,7 +117,8 @@ def main() -> int:
     session = args.output_dir.expanduser().resolve()
     session.mkdir(parents=True, exist_ok=False)
     result = {"schema_version": SCHEMA, "started_at": time.time(),
-              "preflight": preflight, "pairs": [], "status": "running"}
+              "preflight": preflight, "protocol": {"workloads": list(templates),
+              "conditions": ["cold", "warm"], "repetitions": REPETITIONS}, "pairs": [], "status": "running"}
     atomic_json(session / "matrix.json", result)
     try:
         for workload, template_path in templates.items():
@@ -134,6 +138,8 @@ def main() -> int:
                              "repetition": repetition, "audit": audit,
                              "sync_seconds": summaries["sync"]["duration_seconds"],
                              "prefetch_seconds": summaries["prefetch"]["duration_seconds"]}
+                    entry["sync_metrics"] = collect_arm_metrics(jobs["sync"].parent / "run")
+                    entry["prefetch_metrics"] = collect_arm_metrics(jobs["prefetch"].parent / "run")
                     if audit["status"] == "exact":
                         entry["observed_ratio_sync_over_prefetch"] = (
                             entry["sync_seconds"] / entry["prefetch_seconds"])

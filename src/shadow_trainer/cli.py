@@ -11,6 +11,7 @@ from . import __version__
 from .config import JobConfig
 from .demo import run_demo
 from .errors import ShadowTrainerError
+from .pair_analysis import summarize_pair_matrix
 from .pair_audit import audit_pair
 from .reporting import render_report
 from .resources import print_snapshot, snapshot
@@ -47,6 +48,9 @@ def _parser() -> argparse.ArgumentParser:
     pair.add_argument("sync_run", type=Path)
     pair.add_argument("prefetch_run", type=Path)
     pair.add_argument("--output", type=Path)
+    summarize = commands.add_parser("summarize-pairs", help="summarize exact paired timings")
+    summarize.add_argument("matrix", type=Path)
+    summarize.add_argument("--output-dir", required=True, type=Path)
     return parser
 
 
@@ -102,6 +106,10 @@ def main(argv: list[str] | None = None) -> int:
             payload = audit_pair(args.sync_run, args.prefetch_run, args.output)
             print(json.dumps(payload, indent=2, sort_keys=True))
             return 0 if payload["status"] == "exact" else 4
+        if args.command == "summarize-pairs":
+            payload = summarize_pair_matrix(args.matrix, args.output_dir)
+            print(json.dumps(payload, indent=2, sort_keys=True))
+            return 0 if payload["all_performance_claims_eligible"] else 5
     except (ShadowTrainerError, OSError, ValueError, RuntimeError) as exc:
         _print_error(exc)
         return 1

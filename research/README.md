@@ -40,3 +40,19 @@ that failures remain visible and auditable. Stage38 is described in the
 experiment matrix but is not imported because its prefetch arm was never run.
 No speedup, clinical quality, or universal equivalence statement is currently
 permitted.
+
+## Paired physical matrix
+
+The guarded matrix runner launches four workloads, two cache conditions, three
+repetitions, and two strategies as 48 independent Python processes. Run the
+read-only resource gate first:
+
+    PYTHONPATH=src python research/run_pair_matrix.py --preflight-only
+
+After a complete successful matrix, compile timing results with:
+
+    shadow-trainer summarize-pairs MATRIX.json --output-dir pair-summary
+
+The compiler emits JSON, CSV, and Markdown only after checking every exact pair.
+Any missing cell, divergence, invalid duration, or non-success matrix suppresses
+all performance-claim eligibility.

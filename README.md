@@ -43,6 +43,7 @@ Install the package without duplicating PyTorch:
     shadow-trainer report RUN_DIR
     shadow-trainer benchmark research/evidence-spec.json --output-dir research/generated
     shadow-trainer audit-pair SYNC_RUN PREFETCH_RUN --output pair-audit.json
+    shadow-trainer summarize-pairs MATRIX.json --output-dir pair-summary
     shadow-trainer demo --output-dir demo-output
 
 Use --cpu only for portable smoke tests. The Circuito 14 evidence run must use

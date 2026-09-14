@@ -1,0 +1,30 @@
+\subsection{Automated paired matrix and statistical gate}
+
+The next physical experiment is encoded as a fail-closed matrix rather than a
+collection of manually launched commands. It spans Tiny3D, NIfTI 3D,
+ResNet-18, and ResNet-50; separates cold and fully warm cache conditions; and
+requests three sync/prefetch repetitions per cell. Each arm runs in a new
+Python process with an independent cache and output directory, yielding 48
+processes in a complete matrix. The runner checks the physical Windows-volume
+free-space floor before session creation, before and after warm-cache
+preparation, and before each arm. It also enforces a 3-GiB ceiling on the
+matrix session artifacts.
+
+Every pair passes through a semantic auditor before its times are eligible for
+analysis. The auditor compares the canonical manifest, job seed and workload
+configuration, software and accelerator signature, ordered per-step trace,
+checkpoint position, and structured hashes of model, optimizer, and Python,
+Torch, and CUDA RNG state. A divergence stops the matrix immediately. The
+summary compiler is stricter still: it suppresses all timing statistics unless
+the matrix reports success, contains every protocol cell and repetition, and
+has no excluded or non-exact pair. Only then does it report per-cell medians,
+inclusive quartiles, and a deterministic 10,000-resample bootstrap confidence
+interval for the median sync-to-prefetch time ratio.
+
+Small CPU fixtures currently pass exact sync/prefetch audits for all four
+workload configurations, and a deliberately modified checkpoint is detected
+as divergent. These tests validate the audit mechanism and adapter semantics;
+they are not CUDA equivalence or performance evidence. The physical matrix was
+not launched because preflight observed 5,355,749,376 free bytes on the backing
+Windows volume, below the unchanged 21,474,836,480-byte floor. It therefore
+produced no pair or timing claim.

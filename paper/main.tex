@@ -224,7 +224,7 @@ Unit and integration tests cover strict configuration parsing, manifest and
 path validation, atomic partial-transfer behavior, LRU enforcement, admission
 rejection, rclone success and timeout behavior, checkpoint resume without
 repeating confirmed step identifiers, report redaction, the NIfTI adapter, and
-evidence bundle integrity. The current suite contains 25 tests. A paired Tiny3D test establishes exact model, optimizer, and RNG equality after interruption and resume. Small CPU fixtures also pass exact sync/prefetch audits for all four workload configurations.
+evidence bundle integrity. The current suite contains 29 tests. A paired Tiny3D test establishes exact model, optimizer, and RNG equality after interruption and resume. Small CPU fixtures also pass exact sync/prefetch audits for all four workload configurations.
 
 \subsection{Open prefetch gate}
 
@@ -237,6 +237,7 @@ no valid pair and no speedup or equivalence result. Production \texttt{auto}
 therefore remains synchronous.
 
 \input{sections/protocol}
+\input{sections/matrix_automation}
 
 \section{Related work}
 
@@ -269,14 +270,13 @@ repeated performance experiment. The compact NIfTI model does not establish
 medical utility. GPU memory values are workload observations, not maximum
 supported capacity. The current cache trace does not yet demonstrate a remote
 dataset larger than all available local storage. Recovery tests prove step-id idempotence and bitwise final model, optimizer, and
-RNG equality for Tiny3D, but a general claim requires equivalent paired tests
-for the NIfTI and ResNet adapters. Prefetch has not passed its gate.
+RNG equality for Tiny3D. Exact small CPU pairs now cover all four adapters, but
+a general physical claim requires equivalent paired CUDA repetitions. Prefetch has not passed its gate.
 
 The next evaluation uses separate processes and independently prepared caches
 for sync and prefetch, with identical manifest, order, seed, checkpoint, CUDA,
-cuDNN, and driver. Cold and warm runs remain separate. The runtime will stop
-before preparation unless physical disk has at least 30 GiB free, retain a
-20-GiB floor, and cap combined cache and artifacts at 5 GiB. ResNet18, ResNet50,
+cuDNN, and driver. Cold and warm runs remain separate. The matrix runner enforces a 20-GiB physical-disk floor before session creation,
+warm-cache preparation, and every arm, and caps matrix-session artifacts at 3 GiB. ResNet18, ResNet50,
 and a 2.5D adapter will test generality. A framework-local PyTorch/MONAI arm
 will quantify overhead. Only a pair with identical observable state can support
 an overlap-performance claim.

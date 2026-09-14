@@ -15,6 +15,7 @@ blocked unless the listed evidence exists and matches its permitted use.
 | Small CPU sync/prefetch fixtures are semantically exact. | Pair-audit tests for Tiny3D, NIfTI, ResNet18 and ResNet50. | Supported only for small CPU fixtures. | “The audit harness passes controlled CPU fixtures.” |
 | Prefetch is equivalent to sync on the physical CUDA workload. | Complete physical matrix and Stage38 pair. | Pending. | “Prefetch remains experimental.” |
 | Prefetch accelerates training. | Repeated valid paired cold/warm runs. | Not supported. | Do not claim. |
+| Paired timing statistics are eligible for publication. | Successful complete matrix, three exact repetitions in every workload/condition cell, and no exclusions. | Pending. | No paired timing statistic may be reported yet. |
 | Shadow Trainer trains a dataset larger than all local storage. | Complete remote streamed experiment with occupancy trace. | Pending. | Current claim is limited to bounded staging mechanics. |
 | Shadow Trainer improves clinical segmentation. | Held-out patient-level evaluation. | Not supported or in MVP scope. | Do not claim. |
 
