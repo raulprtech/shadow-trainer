@@ -14,14 +14,14 @@ def environment(*, disk_free=10**12, ram=10**12, swap=0, cuda=True, gpu=10**12):
     }
 
 
-def test_auto_selects_prefetch_after_equivalence_gate(tmp_path):
+def test_auto_remains_sync_until_long_stunet_gate(tmp_path):
     config = JobConfig.load(write_job(tmp_path))
     plan = build_plan(config, environment())
-    assert PREFETCH_STABLE
+    assert not PREFETCH_STABLE
     assert plan.admitted
-    assert plan.selected_strategy == "prefetch"
-    assert plan.prefetch_status == "stable"
-    assert plan.warnings == ()
+    assert plan.selected_strategy == "sync"
+    assert plan.prefetch_status == "disabled"
+    assert "pending_prefetch_equivalence_gate" in plan.warnings[0]
 
 
 def test_disk_rejection_is_deterministic(tmp_path):

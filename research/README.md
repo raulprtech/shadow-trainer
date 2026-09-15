@@ -63,3 +63,28 @@ The compiler emits JSON, CSV, and Markdown only after checking every exact pair.
 `execution_seconds` as their timing field.
 Any missing cell, divergence, invalid duration, or non-success matrix suppresses
 all performance-claim eligibility.
+
+
+## STU-Net campaign for thesis review
+
+The bounded campaign is configured in `research/stunet_campaign_config.json`.
+Run its read-only gate first:
+
+    PYTHONPATH=src python research/run_stunet_campaign.py \
+      --config research/stunet_campaign_config.json --preflight-only
+
+After OAuth and a passing gate, launch the autonomous session with:
+
+    PYTHONPATH=src python research/run_stunet_campaign.py \
+      --config research/stunet_campaign_config.json --max-hours 8
+
+Resume only with the durable session directory:
+
+    PYTHONPATH=src python research/run_stunet_campaign.py \
+      --resume research/workspace/stunet-campaign-20260915-r1 --max-hours 8
+
+The protocol compares frozen Stage20, the Stage20 loss, and a hierarchical
+renal/tumor loss. It freezes a hash-selected evaluation cohort, stages cases
+through bounded caches, checkpoints every training case, exports NIfTI masks
+and overlays, and closes with JSON, CSV, HTML and presentation artifacts.
+Stage38 remains the separate long STU-Net sync/prefetch gate.

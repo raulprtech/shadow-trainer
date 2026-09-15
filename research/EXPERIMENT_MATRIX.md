@@ -26,8 +26,8 @@ under a paired protocol?
 | --- | --- | --- | --- |
 | H1 | Admission deterministically prevents resource-floor violations. | Unit rejection tests plus physical low-disk rejection before staging. | Partially supported; physical rejection observed, consolidated run pending. |
 | H2 | Peak cache occupancy never exceeds its configured budget. | Dataset larger than cache; occupancy trace; zero partial promotions. | Supported for MVP fixture; larger remote validation pending. |
-| H3 | Resume reproduces uninterrupted state for the same job. | Paired checkpoint hashes, step ids, losses and final state. | Exact small CPU pairs cover all four adapters; repeated physical CUDA equivalence remains pending. |
-| H4 | Prefetch is exactly equivalent to sync and reduces exposed I/O time. | Valid paired Stage38 run with independent caches and identical seeds. | Open; no claim permitted. |
+| H3 | Resume reproduces uninterrupted state for the same job. | Paired checkpoint hashes, step ids, losses and final state. | Small fixtures pass; case-boundary STU-Net recovery is part of the 20260915 campaign. |
+| H4 | Prefetch is exactly equivalent to sync and reduces exposed I/O time. | Valid paired Stage38 run with independent caches and identical seeds. | Small-workload matrix passes; long STU-Net Stage38 remains open and `auto` stays sync. |
 | H5 | Runtime contracts transfer across workload families. | At least three adapters using the public API. | Supported at physical feasibility level by P1--P4; representative training remains pending. |
 
 ## Baselines

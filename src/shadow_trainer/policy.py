@@ -8,10 +8,9 @@ from typing import Literal
 from .config import JobConfig
 from .resources import gpu_free_bytes
 
-# The frozen physical CUDA matrix passed 24/24 exact sync-prefetch audits.
-# Stability here denotes semantic equivalence in the tested scope; it does not
-# imply universal performance improvement.
-PREFETCH_STABLE = True
+# The small-workload CUDA matrix passed, but the frozen long STU-Net Stage38
+# gate remains incomplete. Auto therefore stays synchronous.
+PREFETCH_STABLE = False
 
 
 @dataclass(frozen=True)

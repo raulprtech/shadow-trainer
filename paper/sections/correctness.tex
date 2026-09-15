@@ -50,9 +50,9 @@ model tensors, optimizer state, Python RNG state, and Torch RNG state between an
 uninterrupted execution and a one-step interruption followed by resume. Equality is established for Tiny3D resume. Separate small CPU fixtures pass the
 sync/prefetch state audit for NIfTI and ResNet, while physical CUDA equivalence
 was subsequently established for all 24 pairs in the complete physical matrix.
-This result is scoped to the tested manifests, seeds, adapter configurations,
-software stack, and RTX 3050 Ti; it is not a proof for arbitrary asynchronous
-data pipelines.
+This result is scoped to the small tested adapters, manifests, seeds, software
+stack, and RTX 3050 Ti. It does not cover the long STU-Net protocol or arbitrary
+asynchronous data pipelines; Stage38 remains open.
 
 \paragraph{Evidence non-escalation.}
 Completing a process is not sufficient to authorize every statement about it.
