@@ -78,3 +78,30 @@ When it returns success and C: has at least 20 GiB free, use a new output name:
 
 Do not reuse a partial output directory. The runner writes `matrix.json` after
 each pair, so a guard stop or divergence remains auditable.
+
+## Physical execution after disk recovery — 2026-09-15
+
+WSL virtual-disk compaction increased free space on the backing Windows volume
+to 54,855,868,416 bytes. The unchanged 21,474,836,480-byte floor therefore
+passed. Preflight reverified all manifests before session creation, including
+the 83,549,098-byte NIfTI source and its canonical manifest digest.
+
+The new `pair-matrix-physical-r1` session completed all 48 independent Python
+processes: four workloads, two cache conditions, three repetitions, and two
+strategies. All 24 sync/prefetch audits returned `exact`; all 24 were eligible
+for comparison; no pair was excluded and no disk, memory, OOM, or divergence
+guard stopped the session. The session occupied approximately 1.3 GiB and the
+physical volume retained approximately 50 GiB free after execution.
+
+The strongest measured effect was the cold-cache NIfTI3D cell. Its median
+audited execution interval was 4.9572 s for sync and 3.4889 s for prefetch,
+giving a median sync/prefetch ratio of 1.4209 and a deterministic 10,000-sample
+bootstrap 95% interval of [1.2842, 1.4739]. Cold ResNet18 also produced an
+interval above one ([1.0290, 1.2190]), but the absolute intervals were short and
+the sample count remains three. Every warm-cache interval, along with Tiny3D
+and ResNet50 cold, crossed one. The admissible conclusion is therefore a
+workload- and cache-condition-specific overlap benefit, not universal speedup.
+
+The canonical lightweight evidence is frozen under
+`research/evidence/pair-matrix-physical-r1/`. The full 1.3-GiB run tree remains
+under the ignored `research/workspace/` directory.
