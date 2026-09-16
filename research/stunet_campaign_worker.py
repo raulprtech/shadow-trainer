@@ -243,7 +243,14 @@ def main() -> int:
         )
         scaler = torch.amp.GradScaler("cuda", enabled=True, init_scale=128.0)
         next_epoch = next_case_index = global_step = 0
-        baseline = validation(model, device, cache, development_cases)
+        resumed = None
+        if latest_path.exists():
+            resumed = torch.load(latest_path, map_location="cpu", weights_only=False)
+            if resumed["schedule"] != schedule or resumed["base_sha256"] != base_sha256:
+                raise RuntimeError("resume provenance mismatch")
+        baseline = (resumed or {}).get("summary", {}).get("baseline_development")
+        if baseline is None:
+            baseline = validation(model, device, cache, development_cases)
         best_tumor = baseline["tumor_mean"]
         best_epoch = 0
         summary["baseline_development"] = baseline
@@ -253,10 +260,7 @@ def main() -> int:
                 next_epoch=0, next_case_index=0, global_step=0, best_tumor=best_tumor,
                 best_epoch=best_epoch, schedule=schedule,
             )
-        if latest_path.exists():
-            resumed = torch.load(latest_path, map_location="cpu", weights_only=False)
-            if resumed["schedule"] != schedule or resumed["base_sha256"] != base_sha256:
-                raise RuntimeError("resume provenance mismatch")
+        if resumed is not None:
             model.load_state_dict(resumed["model_state"])
             optimizer.load_state_dict(resumed["optimizer_state"])
             scaler.load_state_dict(resumed["scaler_state"])
