@@ -164,7 +164,7 @@ def main() -> int:
     schedule = {
         "train_cases": cohort["train_cases"],
         "development_cases": cohort["development_cases"],
-        "seed": config["seed"],
+        "seed": config.get("training_seed", config["seed"]),
         "patches_per_case": config["patches_per_case"],
         "epochs": 1 if args.pilot else args.epochs,
     }
@@ -196,10 +196,11 @@ def main() -> int:
     process = psutil.Process()
     try:
         assert_resources(process)
-        random.seed(config["seed"])
-        np.random.seed(config["seed"])
-        torch.manual_seed(config["seed"])
-        torch.cuda.manual_seed_all(config["seed"])
+        training_seed = config.get("training_seed", config["seed"])
+        random.seed(training_seed)
+        np.random.seed(training_seed)
+        torch.manual_seed(training_seed)
+        torch.cuda.manual_seed_all(training_seed)
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
         # The historical runtime enables strict deterministic algorithms.
@@ -330,7 +331,7 @@ def main() -> int:
                 targets = sample_targets(labels, case_id, epoch)
                 for patch_index, target_class in enumerate(targets):
                     sample_seed = (
-                        config["seed"] + epoch * 1000003 + case_index * 10007 + patch_index * 101
+                        training_seed + epoch * 1000003 + case_index * 10007 + patch_index * 101
                     )
                     x_cpu, y_cpu, patch_metadata = extract_targeted_patch(
                         image, label, 128, target_class, sample_seed, True
