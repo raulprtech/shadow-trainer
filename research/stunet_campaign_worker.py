@@ -267,6 +267,48 @@ def main() -> int:
             best_tumor = resumed["best_tumor"]
             best_epoch = resumed["best_epoch"]
             append_jsonl(metrics_path, {"kind": "run_resumed", "global_step": global_step})
+        metric_rows = []
+        if metrics_path.exists():
+            metric_rows = [json.loads(line) for line in metrics_path.read_text().splitlines() if line.strip()]
+        validated_epochs = {row["epoch"] for row in metric_rows if row.get("kind") == "epoch"}
+        if next_epoch > 0 and next_case_index == 0 and next_epoch not in validated_epochs:
+            development = validation(model, device, cache, development_cases)
+            eligible = (
+                development["kidney_mean"] >= baseline["kidney_mean"] - 0.02
+                and development["tumor_mean"] > best_tumor
+            )
+            if eligible:
+                best_tumor = development["tumor_mean"]
+                best_epoch = next_epoch
+                save_training_checkpoint(
+                    best_path, model=model, optimizer=optimizer, scaler=scaler,
+                    summary=summary, next_epoch=next_epoch, next_case_index=0,
+                    global_step=global_step, best_tumor=best_tumor,
+                    best_epoch=best_epoch, schedule=schedule,
+                )
+            recovered_losses = [
+                row["loss"] for row in metric_rows
+                if row.get("kind") == "train_step" and row.get("epoch") == next_epoch
+            ]
+            epoch_row = {
+                "kind": "epoch", "epoch": next_epoch, "global_step": global_step,
+                "mean_train_loss": float(np.mean(recovered_losses)) if recovered_losses else None,
+                "development": development, "eligible": eligible,
+                "best_epoch": best_epoch, "best_tumor": best_tumor,
+                "recovered_after_boundary": True,
+            }
+            append_jsonl(metrics_path, epoch_row)
+            summary.update({
+                "epochs_completed": next_epoch, "global_step": global_step,
+                "last_epoch": epoch_row, "best_epoch": best_epoch,
+                "best_tumor": best_tumor,
+            })
+            save_training_checkpoint(
+                latest_path, model=model, optimizer=optimizer, scaler=scaler,
+                summary=summary, next_epoch=next_epoch, next_case_index=0,
+                global_step=global_step, best_tumor=best_tumor,
+                best_epoch=best_epoch, schedule=schedule,
+            )
         loss_function = baseline_loss if args.arm == "A" else hierarchical_loss
         peak_allocated = peak_reserved = peak_rss = 0.0
         epochs = schedule["epochs"]
@@ -388,6 +430,12 @@ def main() -> int:
                 "best_tumor": best_tumor, "peak_allocated_mib": peak_allocated,
                 "peak_reserved_mib": peak_reserved, "peak_rss_mib": peak_rss,
             })
+            save_training_checkpoint(
+                latest_path, model=model, optimizer=optimizer, scaler=scaler,
+                summary=summary, next_epoch=epoch + 1, next_case_index=0,
+                global_step=global_step, best_tumor=best_tumor,
+                best_epoch=best_epoch, schedule=schedule,
+            )
             atomic_json(summary_path, summary)
             next_case_index = 0
         last_path = output / "last.checkpoint.pt"

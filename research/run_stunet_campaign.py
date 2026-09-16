@@ -26,11 +26,11 @@ def snapshot(pid=None):
             "available_ram_bytes":memory.available,"swap_used_bytes":swap.used,
             "process_tree_rss_bytes":rss}
 
-def failures(state,startup=False):
+def failures(state,startup=False,swap_limit=256*MIB):
     result=[]
     if state["disk_free_bytes"]<20*GIB+(5*GIB if startup else 0):result.append("physical_disk_floor")
     if state["available_ram_bytes"]<(5*GIB if startup else 512*MIB):result.append("available_ram_floor")
-    if state["swap_used_bytes"]>256*MIB:result.append("swap_limit")
+    if state["swap_used_bytes"]>swap_limit:result.append("swap_limit")
     if state["process_tree_rss_bytes"]>int(4.5*GIB):result.append("process_tree_rss_limit")
     return result
 
@@ -105,7 +105,7 @@ def stage_evaluation(config,cohort,events):
     with Path(events).open("a") as stream:stream.write(json.dumps({"kind":"evaluation_staged",**result})+"\n")
     return result
 
-def run_guarded(command,cwd,log,resources,deadline,phase_deadline):
+def run_guarded(command,cwd,log,resources,deadline,phase_deadline,swap_limit=256*MIB):
     env=dict(os.environ,OMP_NUM_THREADS="2",MKL_NUM_THREADS="2",
              PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True")
     started=time.time();status="running";reasons=[];sample_index=0;session=Path(log).parent
@@ -114,7 +114,7 @@ def run_guarded(command,cwd,log,resources,deadline,phase_deadline):
         try:
             while process.poll() is None:
                 state=snapshot(process.pid);samples.write(json.dumps(state)+"\n");samples.flush()
-                reasons=failures(state);sample_index+=1
+                reasons=failures(state,swap_limit=swap_limit);sample_index+=1
                 if sample_index%10==0 and directory_bytes(session)>5*GIB:reasons.append("campaign_artifact_ceiling")
                 if time.time()>=min(deadline,phase_deadline):reasons.append("time_budget")
                 if reasons:status="guard_stopped";stop_group(process);break
@@ -191,7 +191,7 @@ table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccd;padding:8p
         f"## Señal preliminar\n{'Sí' if signal else 'No'} según el gate predefinido.\n\n"
         "## Circuito14\nRuntime auditable para entrenamiento local limitado.\n\n"
         "## Siguiente\nRéplicas, nnU-Net y validación externa.\n")
-    result={"status":"success","rows":rows,"promising_signal":signal,"best_candidate":best,
+    result={"status":"success" if len(rows)==6 else "partial","rows":rows,"promising_signal":signal,"best_candidate":best,
             "report":str(report_path),"slides":str(slides),"csv":str(csv_path)}
     atomic_json(session/"campaign-results.json",result);return result
 
@@ -225,6 +225,13 @@ def main():
         "schema_version":"shadowtrainer.stunet-campaign/v1","status":"running",
         "started_at":time.time(),"phases":{}}
     previous_active_seconds=historical_active_seconds(state)
+    if state.get("status") != "running":
+        state.setdefault("invocation_history", []).append({
+            "status": state.get("status"), "finished_at": state.get("finished_at"),
+            "error": state.get("error"),
+        })
+    state["status"]="running"
+    state.pop("error",None);state.pop("traceback",None)
     state["active_seconds"]=previous_active_seconds
     deadline=invocation_started+max(0.0,args.max_hours*3600-previous_active_seconds)
     def active_deadline(hours):
@@ -273,6 +280,9 @@ def main():
                 LAB,session/f"train_{arm}.log",session/f"train_{arm}.resources.jsonl",deadline,training_deadline)
             store_attempt(phase,result)
             if result["status"]!="success":break
+        incomplete_training=[arm for arm in ("A","B") if not phase_succeeded(state,f"train_{arm}")]
+        if incomplete_training:
+            raise RuntimeError(f"training incomplete: {incomplete_training}")
         evaluation_deadline=min(deadline,active_deadline(7))
         for cohort_name,development in (("development",True),("evaluation",False)):
             for model in ("B0","A","B"):
@@ -283,9 +293,13 @@ def main():
                     str(session/"resolved-config.json"),"--session",str(session),"--model",model]
                 if development:command.append("--development")
                 result=run_guarded(command,LAB,session/f"{phase}.log",session/f"{phase}.resources.jsonl",
-                    deadline,evaluation_deadline)
+                    deadline,evaluation_deadline,192*MIB)
                 store_attempt(phase,result)
-                if result["status"]!="success":break
+                if result["status"]!="success":
+                    raise RuntimeError(f"evaluation incomplete: {phase}")
+        required_evaluations=[f"evaluate_{cohort}_{model}" for cohort in ("development","evaluation") for model in ("B0","A","B")]
+        missing=[phase for phase in required_evaluations if not phase_succeeded(state,phase)]
+        if missing:raise RuntimeError(f"evaluation incomplete: {missing}")
         state["results"]=report(session);state["status"]="success"
     except Exception as exc:
         state.update({"status":"error","error":repr(exc),"traceback":traceback.format_exc()})

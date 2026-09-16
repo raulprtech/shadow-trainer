@@ -7,7 +7,7 @@ import pytest
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "research"))
 
-from run_stunet_campaign import historical_active_seconds, phase_succeeded
+from run_stunet_campaign import failures, historical_active_seconds, phase_succeeded, report
 
 from stunet_campaign import (
     aggregate_rows,
@@ -71,3 +71,20 @@ def test_historical_active_time_ignores_external_wall_pause():
     assert historical_active_seconds(state) == 279.0
     state["active_seconds"] = 300.0
     assert historical_active_seconds(state) == 300.0
+
+
+def test_evaluation_swap_guard_is_stricter_than_training_guard():
+    mib = 2 ** 20
+    gib = 2 ** 30
+    state = {
+        "disk_free_bytes": 30 * gib, "available_ram_bytes": 6 * gib,
+        "swap_used_bytes": 200 * mib, "process_tree_rss_bytes": 0,
+    }
+    assert "swap_limit" not in failures(state, swap_limit=256 * mib)
+    assert "swap_limit" in failures(state, swap_limit=192 * mib)
+
+
+def test_report_is_partial_until_all_six_evaluations_exist(tmp_path):
+    result = report(tmp_path)
+    assert result["status"] == "partial"
+    assert result["rows"] == []
