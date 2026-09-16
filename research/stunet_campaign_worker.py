@@ -241,7 +241,7 @@ def main() -> int:
             ],
             weight_decay=1e-5,
         )
-        scaler = torch.amp.GradScaler("cuda", enabled=True)
+        scaler = torch.amp.GradScaler("cuda", enabled=True, init_scale=128.0)
         next_epoch = next_case_index = global_step = 0
         baseline = validation(model, device, cache, development_cases)
         best_tumor = baseline["tumor_mean"]
@@ -290,20 +290,36 @@ def main() -> int:
                         image, label, 128, target_class, sample_seed, True
                     )
                     x, y = x_cpu.to(device), y_cpu.to(device)
-                    optimizer.zero_grad(set_to_none=True)
                     torch.cuda.reset_peak_memory_stats()
-                    with torch.amp.autocast("cuda", dtype=torch.float16):
-                        logits = normalize_logits(model(x))
-                        loss, cross_entropy, dice, renal, tumor = loss_function(logits, y)
-                    if not bool(torch.isfinite(loss)):
-                        raise FloatingPointError("nonfinite loss")
-                    scaler.scale(loss).backward()
-                    scaler.unscale_(optimizer)
-                    gradient_norm = torch.nn.utils.clip_grad_norm_(
-                        model.parameters(), 1.0, error_if_nonfinite=True
-                    )
-                    scaler.step(optimizer)
-                    scaler.update()
+                    for amp_attempt in range(8):
+                        optimizer.zero_grad(set_to_none=True)
+                        with torch.amp.autocast("cuda", dtype=torch.float16):
+                            logits = normalize_logits(model(x))
+                            loss, cross_entropy, dice, renal, tumor = loss_function(logits, y)
+                        if not bool(torch.isfinite(loss)):
+                            raise FloatingPointError("nonfinite loss")
+                        scale_before = float(scaler.get_scale())
+                        scaler.scale(loss).backward()
+                        scaler.unscale_(optimizer)
+                        gradient_norm = torch.nn.utils.clip_grad_norm_(
+                            model.parameters(), 1.0, error_if_nonfinite=False
+                        )
+                        if bool(torch.isfinite(gradient_norm)):
+                            scaler.step(optimizer)
+                            scaler.update()
+                            break
+                        scaler.step(optimizer)  # found_inf makes this a no-op
+                        scaler.update()
+                        append_jsonl(metrics_path, {
+                            "kind": "amp_overflow", "arm": args.arm,
+                            "epoch": epoch + 1, "case_index": case_index,
+                            "patch_index": patch_index, "case_id": case_id,
+                            "attempt": amp_attempt + 1,
+                            "scale_before": scale_before,
+                            "scale_after": float(scaler.get_scale()),
+                        })
+                        if amp_attempt == 7:
+                            raise FloatingPointError("nonfinite gradients after 8 AMP retries")
                     global_step += 1
                     value = float(loss.detach().cpu())
                     epoch_losses.append(value)
