@@ -7,6 +7,8 @@ import pytest
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "research"))
 
+from run_stunet_campaign import historical_active_seconds, phase_succeeded
+
 from stunet_campaign import (
     aggregate_rows,
     sample_targets,
@@ -52,3 +54,20 @@ def test_aggregate_rows_reports_macro_and_micro():
     result = aggregate_rows([first, second])
     assert result["classes"]["2"]["mean_dice"] == pytest.approx(0.5)
     assert result["classes"]["2"]["micro_dice"] == pytest.approx(2 / 3)
+
+
+def test_failed_phase_is_retried_and_only_success_is_skipped():
+    state = {"phases": {"pilot": {"status": "failed"}}}
+    assert not phase_succeeded(state, "pilot")
+    state["phases"]["pilot"]["status"] = "success"
+    assert phase_succeeded(state, "pilot")
+
+
+def test_historical_active_time_ignores_external_wall_pause():
+    state = {"started_at": 1.0, "finished_at": 10001.0, "phases": {
+        "evaluation_staging": {"status": "success", "seconds": 173.0},
+        "pilot": {"status": "failed", "seconds": 106.0},
+    }}
+    assert historical_active_seconds(state) == 279.0
+    state["active_seconds"] = 300.0
+    assert historical_active_seconds(state) == 300.0

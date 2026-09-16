@@ -134,6 +134,19 @@ def training_step_median(metrics):
     deltas=[right-left for left,right in zip(stamps,stamps[1:]) if right>=left]
     return statistics.median(deltas) if deltas else 3.0
 
+def phase_succeeded(state, name):
+    return state.get("phases", {}).get(name, {}).get("status") == "success"
+
+def historical_active_seconds(state):
+    """Best-effort migration for sessions created before active-time accounting."""
+    if "active_seconds" in state:
+        return float(state["active_seconds"])
+    return sum(
+        float(phase.get("seconds", 0.0))
+        for phase in state.get("phases", {}).values()
+        if isinstance(phase, dict)
+    )
+
 def report(session):
     rows=[]
     for cohort in ("development","evaluation"):
@@ -186,6 +199,7 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument("--config",type=Path)
     parser.add_argument("--preflight-only",action="store_true");parser.add_argument("--max-hours",type=float,default=8)
     parser.add_argument("--resume",type=Path);args=parser.parse_args()
+    invocation_started=time.time()
     if args.resume:session=args.resume.resolve();config_path=session/"resolved-config.json"
     else:
         if not args.config:parser.error("--config required unless --resume is used")
@@ -210,9 +224,18 @@ def main():
     state=load_json(state_path) if state_path.exists() else {
         "schema_version":"shadowtrainer.stunet-campaign/v1","status":"running",
         "started_at":time.time(),"phases":{}}
-    deadline=state["started_at"]+args.max_hours*3600
+    previous_active_seconds=historical_active_seconds(state)
+    state["active_seconds"]=previous_active_seconds
+    deadline=invocation_started+max(0.0,args.max_hours*3600-previous_active_seconds)
+    def active_deadline(hours):
+        return invocation_started+max(0.0,hours*3600-previous_active_seconds)
     def save_state():
         state["updated_at"]=time.time();state["resources"]=snapshot();atomic_json(state_path,state)
+    def store_attempt(name,result):
+        previous=state["phases"].get(name)
+        if previous and previous.get("status")!="success":
+            state.setdefault("attempt_history",{}).setdefault(name,[]).append(previous)
+        state["phases"][name]=result;save_state()
     try:
         if "cohort" not in state["phases"]:
             cohort=build_cohort(config);atomic_json(session/"cohort.json",cohort)
@@ -230,27 +253,27 @@ def main():
         if "evaluation_staging" not in state["phases"]:
             state["phases"]["evaluation_staging"]=stage_evaluation(config,cohort,events);save_state()
         python=config["python"]
-        if "pilot" not in state["phases"]:
+        if not phase_succeeded(state,"pilot"):
             result=run_guarded([python,str(HERE/"stunet_campaign_worker.py"),"--config",
                 str(session/"resolved-config.json"),"--session",str(session),"--arm","A","--epochs","1","--pilot"],
                 LAB,session/"pilot.log",session/"pilot.resources.jsonl",deadline,
-                min(deadline,state["started_at"]+90*60))
-            state["phases"]["pilot"]=result;save_state()
+                min(deadline,active_deadline(1.5)))
+            store_attempt("pilot",result)
             if result["status"]!="success":raise RuntimeError("pilot failed")
         median=training_step_median(session/"pilot_A"/"metrics.jsonl")
         projected=median*24*8*4*2*1.5
         epochs=4 if time.time()+projected+3*3600<deadline else 2
         state["epochs_selected"]=epochs;state["pilot_step_median_seconds"]=median;save_state()
-        training_deadline=min(deadline,state["started_at"]+4.75*3600)
+        training_deadline=min(deadline,active_deadline(4.75))
         for arm in ("A","B"):
             phase=f"train_{arm}"
             if state["phases"].get(phase,{}).get("status")=="success":continue
             result=run_guarded([python,str(HERE/"stunet_campaign_worker.py"),"--config",
                 str(session/"resolved-config.json"),"--session",str(session),"--arm",arm,"--epochs",str(epochs)],
                 LAB,session/f"train_{arm}.log",session/f"train_{arm}.resources.jsonl",deadline,training_deadline)
-            state["phases"][phase]=result;save_state()
+            store_attempt(phase,result)
             if result["status"]!="success":break
-        evaluation_deadline=min(deadline,state["started_at"]+7*3600)
+        evaluation_deadline=min(deadline,active_deadline(7))
         for cohort_name,development in (("development",True),("evaluation",False)):
             for model in ("B0","A","B"):
                 if model!="B0" and not (session/f"arm_{model}"/"best.checkpoint.pt").exists():continue
@@ -261,7 +284,7 @@ def main():
                 if development:command.append("--development")
                 result=run_guarded(command,LAB,session/f"{phase}.log",session/f"{phase}.resources.jsonl",
                     deadline,evaluation_deadline)
-                state["phases"][phase]=result;save_state()
+                store_attempt(phase,result)
                 if result["status"]!="success":break
         state["results"]=report(session);state["status"]="success"
     except Exception as exc:
@@ -269,6 +292,10 @@ def main():
         try:state["results"]=report(session)
         except Exception as report_error:state["report_error"]=repr(report_error)
     finally:
-        state["finished_at"]=time.time();state["duration_seconds"]=state["finished_at"]-state["started_at"];save_state()
+        state["finished_at"]=time.time()
+        state["active_seconds"]=previous_active_seconds+(state["finished_at"]-invocation_started)
+        state["duration_seconds"]=state["active_seconds"]
+        state["wall_seconds"]=state["finished_at"]-state["started_at"]
+        save_state()
     print(json.dumps(state,indent=2));return 0 if state["status"]=="success" else 1
 if __name__=="__main__":raise SystemExit(main())
