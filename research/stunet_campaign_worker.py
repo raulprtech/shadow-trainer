@@ -202,8 +202,12 @@ def main() -> int:
         torch.cuda.manual_seed_all(config["seed"])
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
-        torch.use_deterministic_algorithms(True, warn_only=True)
+        # The historical runtime enables strict deterministic algorithms.
+        # Apply the campaign's audited warn-only policy afterwards because
+        # CUDA NLL/CrossEntropy has no deterministic implementation in this
+        # PyTorch/CUDA build. Seeds and deterministic cuDNN remain enabled.
         configure(True)
+        torch.use_deterministic_algorithms(True, warn_only=True)
         device = torch.device("cuda")
         raw_manifest = json.loads(Path(config["manifest"]).read_text())
         sizes = {
