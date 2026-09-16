@@ -46,8 +46,8 @@ def load_json(path):return json.loads(Path(path).read_text())
 def directory_bytes(path):
     return sum(item.stat().st_size for item in Path(path).rglob("*") if item.is_file())
 
-def preflight(config,require_remote=True):
-    state=snapshot();issues=failures(state,startup=True)
+def preflight(config,require_remote=True,startup=True):
+    state=snapshot();issues=failures(state,startup=startup)
     paths=[Path(config[key]) for key in ("manifest","base_checkpoint","train_csv","validation_csv","cache_seed","stage34_schedule")]
     for path in paths:
         if not path.exists():issues.append(f"missing:{path}")
@@ -205,11 +205,11 @@ def main():
         if not args.config:parser.error("--config required unless --resume is used")
         config_path=args.config.resolve();base=load_json(config_path)
         session=(Path(base["output_root"])/base["session_name"]).resolve()
-    config=load_json(config_path);check=preflight(config,True)
+    config=load_json(config_path);startup=not bool(args.resume);check=preflight(config,True,startup=startup)
     if not args.preflight_only and check["issues"]==["available_ram_floor"]:
         wait_deadline=time.time()+1800
         while time.time()<wait_deadline and check["issues"]==["available_ram_floor"]:
-            time.sleep(15);check=preflight(config,True)
+            time.sleep(15);check=preflight(config,True,startup=startup)
     if args.preflight_only:
         print(json.dumps(check,indent=2));return 0 if check["status"]=="pass" else 2
     if check["status"]!="pass":raise RuntimeError("preflight failed: "+",".join(check["issues"]))

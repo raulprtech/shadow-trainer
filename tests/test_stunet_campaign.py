@@ -88,3 +88,13 @@ def test_report_is_partial_until_all_six_evaluations_exist(tmp_path):
     result = report(tmp_path)
     assert result["status"] == "partial"
     assert result["rows"] == []
+
+
+def test_five_gib_ram_floor_applies_only_to_initial_start():
+    gib = 2 ** 30
+    state = {
+        "disk_free_bytes": 30 * gib, "available_ram_bytes": 4 * gib,
+        "swap_used_bytes": 0, "process_tree_rss_bytes": 0,
+    }
+    assert "available_ram_floor" in failures(state, startup=True)
+    assert "available_ram_floor" not in failures(state, startup=False)
