@@ -175,7 +175,12 @@ def evaluate_case(model, device, cache: Path, case_id: str, output: Path) -> dic
     spacing = tuple(float(value) for value in image_nii.header.get_zooms()[:3])
     image_shape = tuple(int(value) for value in image_nii.shape)
     pads = tuple((max(0, 128 - length) // 2, max(0, 128 - length) - max(0, 128 - length) // 2) for length in image_shape)
-    image_source = materialize_image_memmap(image_nii.dataobj, image_shape, case_id)
+    # Avoid paging a full large CT memmap into RSS. Read large cases directly
+    # from the compressed NIfTI proxy, one bounded patch at a time.
+    if int(np.prod(image_shape)) > 64_000_000:
+        image_source = image_nii.dataobj
+    else:
+        image_source = materialize_image_memmap(image_nii.dataobj, image_shape, case_id)
     padded_shape = tuple(length + before + after for length, (before, after) in zip(image_shape, pads))
     crop = tuple(slice(before, before + length) for length, (before, _after) in zip(image_shape, pads))
     grid = [starts(length, 128, 64) for length in padded_shape]
