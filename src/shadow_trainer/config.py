@@ -10,8 +10,12 @@ from typing import Any, Literal
 
 from .errors import ConfigurationError
 
-SCHEMA_VERSION = "shadowtrainer.job/v1"
+LEGACY_SCHEMA_VERSION = "shadowtrainer.job/v1"
+SCHEMA_VERSION = "shadowtrainer.job/v2"
+SUPPORTED_SCHEMA_VERSIONS = {LEGACY_SCHEMA_VERSION, SCHEMA_VERSION}
+PROVENANCE_SCHEMA = "clinical-nigma.shadow-provenance/v1"
 _JOB_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
+_SHA256 = re.compile(r"^[a-f0-9]{64}$")
 
 
 def _mapping(value: Any, name: str) -> dict[str, Any]:
@@ -26,6 +30,33 @@ def _positive(value: Any, name: str, *, allow_zero: bool = False) -> int:
     if value < 0 or (value == 0 and not allow_zero):
         raise ConfigurationError(f"{name} must be {'non-negative' if allow_zero else 'positive'}")
     return value
+
+
+def _provenance(value: Any, schema_version: str, job_id: str) -> dict[str, str] | None:
+    if schema_version == LEGACY_SCHEMA_VERSION:
+        if value is not None:
+            raise ConfigurationError("job/v1 must not contain clinical provenance")
+        return None
+    item = _mapping(value, "provenance")
+    required = {
+        "schema_version", "bridge_version", "experiment_id", "experiment_digest",
+        "execution_split", "split_ref", "manifest_sha256", "variant_id",
+    }
+    if set(item) != required:
+        raise ConfigurationError("provenance has missing or unknown fields")
+    if item.get("schema_version") != PROVENANCE_SCHEMA:
+        raise ConfigurationError(f"provenance.schema_version must be {PROVENANCE_SCHEMA!r}")
+    if item.get("experiment_id") != job_id:
+        raise ConfigurationError("provenance.experiment_id must match job_id")
+    for name in ("experiment_digest", "manifest_sha256"):
+        if not isinstance(item.get(name), str) or not _SHA256.fullmatch(item[name]):
+            raise ConfigurationError(f"provenance.{name} must be a sha256 digest")
+    if item.get("execution_split") not in {"train", "development"}:
+        raise ConfigurationError("provenance.execution_split must be train or development")
+    for name in ("bridge_version", "split_ref", "variant_id"):
+        if not isinstance(item.get(name), str) or not item[name].strip():
+            raise ConfigurationError(f"provenance.{name} must be a non-empty string")
+    return {key: str(item[key]) for key in sorted(required)}
 
 
 @dataclass(frozen=True)
@@ -78,6 +109,7 @@ class JobConfig:
     resources: ResourceLimits
     training: TrainingConfig
     workload: WorkloadConfig
+    provenance: dict[str, str] | None
     config_path: Path
 
     @classmethod
@@ -88,11 +120,13 @@ class JobConfig:
         except (OSError, json.JSONDecodeError) as exc:
             raise ConfigurationError(f"cannot read job config: {exc}") from exc
         root = config_path.parent
-        if raw.get("schema_version") != SCHEMA_VERSION:
-            raise ConfigurationError(f"schema_version must be {SCHEMA_VERSION!r}")
+        schema_version = raw.get("schema_version")
+        if not isinstance(schema_version, str) or schema_version not in SUPPORTED_SCHEMA_VERSIONS:
+            raise ConfigurationError(f"schema_version must be one of {sorted(SUPPORTED_SCHEMA_VERSIONS)!r}")
         job_id = raw.get("job_id")
         if not isinstance(job_id, str) or not _JOB_ID.fullmatch(job_id):
             raise ConfigurationError("job_id contains unsupported characters")
+        provenance = _provenance(raw.get("provenance"), schema_version, job_id)
         strategy = raw.get("strategy", "auto")
         if strategy not in {"sync", "prefetch", "auto"}:
             raise ConfigurationError("strategy must be sync, prefetch, or auto")
@@ -127,7 +161,7 @@ class JobConfig:
         cache_dir = relative(data.get("cache_dir"), "data.cache_dir")
         disk_check_raw = resources.get("disk_check_path", str(cache_dir))
         return cls(
-            schema_version=SCHEMA_VERSION,
+            schema_version=schema_version,
             job_id=job_id,
             seed=_positive(raw.get("seed", 1), "seed", allow_zero=True),
             output_dir=output_dir,
@@ -179,10 +213,11 @@ class JobConfig:
                 options=_mapping(workload.get("options", {}), "workload.options"),
             ),
             config_path=config_path,
+            provenance=provenance,
         )
 
     def public_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "schema_version": self.schema_version,
             "job_id": self.job_id,
             "seed": self.seed,
@@ -198,3 +233,6 @@ class JobConfig:
             "training": vars(self.training),
             "workload": {"type": self.workload.type, "options": self.workload.options},
         }
+        if self.provenance is not None:
+            payload["provenance"] = self.provenance
+        return payload
