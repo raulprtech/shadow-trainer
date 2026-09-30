@@ -1,5 +1,7 @@
 # Guion de video de 100 segundos
 
+Guion histórico. Versión actual de revisión: [guion actualizado](circuito14-review-2026-09-20/video-script.md). No se ha grabado ni publicado un video por esta actualización.
+
 ## 0–15 s
 
 Una GPU puede mostrar memoria libre y aun así fallar: el modelo compite con

@@ -1,0 +1,50 @@
+{
+  "schema": "shadowtrainer.reproducible-mvp-acceptance/v1",
+  "status": "verified_on_this_host",
+  "platform": "WSL/Linux x86_64 CPython3.12.3",
+  "environment": ".venv; isolated, not editable; no borrowed PYTHONPATH",
+  "locked_dependencies": 38,
+  "installed_source_modules_matched": 21,
+  "pip_check": "no broken requirements",
+  "tests": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "65",
+    "time": "27.289",
+    "timestamp": "2026-09-20T21:21:24.298604-06:00",
+    "hostname": "redacted"
+  },
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "cuda_build": "13.0",
+  "demo": {
+    "steps": 12,
+    "mode": "sync",
+    "wall_seconds": 9.342300094001985,
+    "peak_gpu_reserved_bytes": 23068672
+  },
+  "resource_samples": {
+    "count": 10,
+    "min_disk_free_bytes": 38426419200,
+    "min_ram_available_bytes": 4227674112,
+    "max_swap_used_bytes": 3956736,
+    "max_tree_rss_bytes": 1453359104
+  },
+  "hashes": {
+    "research/requirements-mvp-linux-py312.lock": "b709eb8da938b9156c62822e6f5f9201570a21214eeb7a8dab46dcddb00c22e9",
+    "research/workspace/mvp-package-r1/shadow_trainer-0.1.0-py3-none-any.whl": "7e17113f27ade40b3edf0c2269c07bcab9b7f2ddcb814fa40f31045714849f2f",
+    "research/workspace/mvp-tests-r1.xml": "2c8e588bb42b791bfdca2ca534a96cc4f60536c5c9a035605e1764dcf7dbd1c5",
+    "research/workspace/mvp-physical-r1/acceptance.json": "8ec997a7109a508836c9b6bd36bfec9499cd1ec862ae22d2105c9d660c9acd11",
+    "research/prepare_offline_environment.py": "0aa25a230fb4d65cde0748eec9b679bdf92294f981542350bc3ae99dd84fbe3e",
+    "research/validate_installed_mvp.py": "7ad3bb0d74f22a9f28c39fac42187272855f634fb5b0e539f27dd96fde22fd61",
+    "pyproject.toml": "a9a6c05ad5fe99de8ab550f6eff8e3609ae2bff350365e25ad58d08a5472fda6"
+  },
+  "limits": [
+    "Validated on this workstation; not across arbitrary machines",
+    "Dependency wheel hashes fix identity, not upstream authenticity",
+    "No clinical claim; long STU-Net gate pending",
+    "Per-step CPU resume covered in full suite; GPU demo here is uninterrupted",
+    "Existing pip cache reused through archive hardlinks; installed packages independent"
+  ]
+}

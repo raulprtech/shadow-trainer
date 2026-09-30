@@ -11,3 +11,45 @@ evidence/*-cache/
 evidence/*-run/
 evidence/*-run-v*/
 research/workspace/
+
+# Local data, credentials, model states and reconstructed output.
+.env
+.env.*
+!.env.example
+.aws/
+.ssh/
+.config/
+credentials*.json
+client_secret*.json
+token.json
+tokens.json
+rclone.conf
+*.pem
+*.key
+*.p12
+*.pfx
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.nii
+*.nii.gz
+*.dcm
+data/
+datasets/
+cache/
+.cache/
+*.partial
+*.tmp
+
+# Keep detailed case-level research receipts and local coordination private.
+research/evidence/stunet*/
+research/jobs/stunet-r2-final-frozen-plan*.json
+docs/coordination/*
+!docs/coordination/reproducible-mvp-2026-09-20.md
+!docs/coordination/reproducible-mvp-acceptance-2026-09-20.json
+!docs/coordination/demo-cpu-acceptance-2026-09-20.md
+!docs/coordination/demo-cpu-acceptance-2026-09-20.json
+
+# Application documents are maintained separately in the thesis vault.
+docs/circuito14-application-2026-09-29/

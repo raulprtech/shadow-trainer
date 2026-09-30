@@ -1,0 +1,23 @@
+{
+  "base_checkpoint": "/home/raulprtech/stream-hot-kits-mini/runs/stage20_stable_background_20260828/best.checkpoint.pt",
+  "base_checkpoint_sha256": "2a6811cf002fe91e3d4d36281735eadf2f4735be61bc7aac566dbac784f5b9bb",
+  "cache_seed": "/home/raulprtech/stream-hot-kits-mini/cache_drive_2gib",
+  "campaign_artifact_ceiling_bytes": 2415919104,
+  "evaluation_cache_bytes": 536870912,
+  "laboratory_root": "/home/raulprtech/stream-hot-kits-mini",
+  "manifest": "/home/raulprtech/stream-hot-kits-mini/manifests/kits23_drive_full.json",
+  "output_root": "/home/raulprtech/shadow-trainer/research/workspace",
+  "patches_per_case": 8,
+  "physical_disk_floor_bytes": 21474836480,
+  "python": "/home/raulprtech/clinical_core/.venv/bin/python",
+  "remote": "datatesis_ro:data/raw/kits23/dataset",
+  "schema_version": "shadowtrainer.stunet-campaign-config/v1",
+  "seed": 20260915,
+  "session_name": "stunet-train-all-seed20260922-v1",
+  "stage34_schedule": "/home/raulprtech/stream-hot-kits-mini/runs/stage34_long_sync_20260908/schedule.json",
+  "train_csv": "/home/raulprtech/stream-hot-kits-mini/source_manifest/existing_split/kits23_train_cases.csv",
+  "training_cache": "/home/raulprtech/shadow-trainer/research/workspace/stunet-train-all-seed20260922-v1/training_cache",
+  "training_cache_bytes": 1073741824,
+  "training_seed": 20260922,
+  "validation_csv": "/home/raulprtech/stream-hot-kits-mini/source_manifest/existing_split/kits23_val_cases.csv"
+}

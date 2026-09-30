@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import gc
+import fcntl
+import tempfile
 import json
 import os
 import shutil
@@ -17,6 +19,7 @@ import nibabel as nib
 import numpy as np
 import psutil
 import torch
+from numpy._core.multiarray import _reconstruct
 from scipy import ndimage
 
 ROOT = Path("/home/raulprtech/stream-hot-kits-mini")
@@ -28,8 +31,27 @@ from experiments.stage32.full_volume import normalize_patch, pad_to_patch, start
 from kits23_mini_worker import build_model, normalize_logits
 from stunet_campaign import HEC_CLASSES, aggregate_rows, atomic_json, segmentation_metrics, sha256_file
 
+from prediction_provenance import binding, seal, verify, sha256
+from audit_development_masks import geometry
+from decoded_volume_cache import materialize, evict
+
 GIB = 2**30
 MIB = 2**20
+SURFACE_VOXEL_LIMIT = 20_000_000
+
+
+def load_checkpoint_safely(path: Path, *, map_location="cpu") -> dict:
+    """Read local campaign checkpoints with PyTorch's restricted unpickler.
+
+    Historical RNG state uses NumPy arrays and uint32 dtype. These are the
+    only non-default globals present in the statically inspected checkpoint.
+    """
+    allowed = [_reconstruct, np.ndarray, np.dtype, type(np.dtype("uint32"))]
+    with torch.serialization.safe_globals(allowed):
+        payload = torch.load(path, map_location=map_location, weights_only=True)
+    if not isinstance(payload, dict) or "model_state" not in payload:
+        raise ValueError("checkpoint lacks model_state")
+    return payload
 
 
 def hd95(prediction, target, spacing) -> tuple[float | None, str]:
@@ -95,24 +117,6 @@ def save_overlay(image, target, prediction, path: Path, title: str) -> None:
     plt.close(fig)
 
 
-def materialize_image_memmap(proxy, shape: tuple[int, ...], case_id: str) -> np.memmap:
-    """Decode a compressed NIfTI once into a reusable disk-backed float32 cache."""
-    cache_path = Path("/tmp") / f"shadowtrainer-stunet-{case_id}.f32"
-    expected_bytes = int(np.prod(shape)) * np.dtype(np.float32).itemsize
-    if not cache_path.exists() or cache_path.stat().st_size != expected_bytes:
-        partial = cache_path.with_suffix(cache_path.suffix + ".partial")
-        if partial.exists():
-            partial.unlink()
-        mapped = np.memmap(partial, mode="w+", dtype=np.float32, shape=shape)
-        for start in range(0, shape[0], 8):
-            stop = min(start + 8, shape[0])
-            mapped[start:stop] = np.asarray(proxy[start:stop, :, :], dtype=np.float32)
-        mapped.flush()
-        del mapped
-        os.replace(partial, cache_path)
-    return np.memmap(cache_path, mode="r", dtype=np.float32, shape=shape)
-
-
 def read_proxy_patch(proxy, starts_xyz, patch, pads, shape) -> np.ndarray:
     """Read one padded patch without materializing the full CT volume."""
     output = np.full((patch, patch, patch), -1024.0, dtype=np.float32)
@@ -164,7 +168,8 @@ def bounded_segmentation_metrics(prediction: np.ndarray, target: np.ndarray) -> 
 
 HEC_CLASS_NAMES = {1: "kidney", 2: "tumor", 3: "cyst"}
 
-def evaluate_case(model, device, cache: Path, case_id: str, output: Path) -> dict:
+def evaluate_case(model, device, cache: Path, case_id: str, output: Path,
+                  image_sha256: str, *, surface_voxel_limit: int = SURFACE_VOXEL_LIMIT) -> dict:
     process = psutil.Process()
     case_dir = cache / case_id
     image_nii = nib.load(case_dir / "imaging.nii.gz", keep_file_open=True)
@@ -175,12 +180,10 @@ def evaluate_case(model, device, cache: Path, case_id: str, output: Path) -> dic
     spacing = tuple(float(value) for value in image_nii.header.get_zooms()[:3])
     image_shape = tuple(int(value) for value in image_nii.shape)
     pads = tuple((max(0, 128 - length) // 2, max(0, 128 - length) - max(0, 128 - length) // 2) for length in image_shape)
-    # Avoid paging a full large CT memmap into RSS. Read large cases directly
-    # from the compressed NIfTI proxy, one bounded patch at a time.
-    if int(np.prod(image_shape)) > 64_000_000:
-        image_source = image_nii.dataobj
-    else:
-        image_source = materialize_image_memmap(image_nii.dataobj, image_shape, case_id)
+    # Decode once per source digest into this new session's bounded cache.
+    # No historical identifier/size-only /tmp cache is trusted.
+    image_source = materialize(image_nii, image_sha256,
+                               output.parents[2] / 'decoded_cache')
     padded_shape = tuple(length + before + after for length, (before, after) in zip(image_shape, pads))
     crop = tuple(slice(before, before + length) for length, (before, _after) in zip(image_shape, pads))
     grid = [starts(length, 128, 64) for length in padded_shape]
@@ -233,19 +236,32 @@ def evaluate_case(model, device, cache: Path, case_id: str, output: Path) -> dic
     prediction = prediction_padded[crop]
     del prediction_padded
     metrics = bounded_segmentation_metrics(prediction, target)
+    # Each HD95 distance transform can allocate many bytes per voxel. This
+    # conservative limit is separate from the overlap-metric slab budget.
+    large_volume = prediction.size > surface_voxel_limit
     for class_id in (1, 2, 3):
-        value, status = hd95(prediction == class_id, target == class_id, spacing)
+        value, status = ((None, 'skipped_memory_budget') if large_volume
+                         else hd95(prediction == class_id, target == class_id, spacing))
         metrics["classes"][str(class_id)]["hd95_mm"] = value
         metrics["classes"][str(class_id)]["surface_status"] = status
     for name, labels in HEC_CLASSES.items():
-        value, status = hd95(np.isin(prediction, labels), np.isin(target, labels), spacing)
+        value, status = ((None, 'skipped_memory_budget') if large_volume
+                         else hd95(np.isin(prediction, labels), np.isin(target, labels), spacing))
         metrics["hec"][name]["hd95_mm"] = value
         metrics["hec"][name]["surface_status"] = status
     prediction_path = output / "predictions" / f"{case_id}.nii.gz"
     prediction_path.parent.mkdir(parents=True, exist_ok=True)
     header = label_nii.header.copy()
     header.set_data_dtype(np.uint8)
-    nib.save(nib.Nifti1Image(prediction, label_nii.affine, header), prediction_path)
+    fd, temporary = tempfile.mkstemp(dir=prediction_path.parent, suffix='.nii.gz')
+    os.close(fd)
+    try:
+        nib.save(nib.Nifti1Image(prediction, label_nii.affine, header), temporary)
+        with open(temporary, 'rb') as stream:
+            os.fsync(stream.fileno())
+        os.link(temporary, prediction_path)  # exclusive, never overwrite
+    finally:
+        os.unlink(temporary)
     overlay_path = None
     overlay_status = "ok"
     if int(np.prod(image_shape)) <= 64_000_000:
@@ -280,7 +296,8 @@ def evaluate_case(model, device, cache: Path, case_id: str, output: Path) -> dic
     return result
 
 
-def evaluate_saved_prediction(cache: Path, case_id: str, output: Path) -> dict:
+def evaluate_saved_prediction(cache: Path, case_id: str, output: Path,
+                              *, surface_voxel_limit: int = SURFACE_VOXEL_LIMIT) -> dict:
     """Resume a case whose prediction was durably written before interruption."""
     case_dir = cache / case_id
     image_nii = nib.load(case_dir / "imaging.nii.gz", keep_file_open=True)
@@ -289,16 +306,18 @@ def evaluate_saved_prediction(cache: Path, case_id: str, output: Path) -> dict:
     prediction_nii = nib.load(prediction_path)
     target = np.asarray(label_nii.dataobj, dtype=np.uint8)
     prediction = np.asarray(prediction_nii.dataobj, dtype=np.uint8)
-    if prediction.shape != target.shape:
-        raise ValueError(f"{case_id}: saved prediction shape mismatch")
+    geometry(image_nii, label_nii, prediction_nii)
     spacing = tuple(float(value) for value in image_nii.header.get_zooms()[:3])
     metrics = bounded_segmentation_metrics(prediction, target)
+    large_volume = prediction.size > surface_voxel_limit
     for class_id in (1, 2, 3):
-        value, status = hd95(prediction == class_id, target == class_id, spacing)
+        value, status = ((None, 'skipped_memory_budget') if large_volume
+                         else hd95(prediction == class_id, target == class_id, spacing))
         metrics["classes"][str(class_id)]["hd95_mm"] = value
         metrics["classes"][str(class_id)]["surface_status"] = status
     for name, labels in HEC_CLASSES.items():
-        value, status = hd95(np.isin(prediction, labels), np.isin(target, labels), spacing)
+        value, status = ((None, 'skipped_memory_budget') if large_volume
+                         else hd95(np.isin(prediction, labels), np.isin(target, labels), spacing))
         metrics["hec"][name]["hd95_mm"] = value
         metrics["hec"][name]["surface_status"] = status
     padded_shape = tuple(max(128, int(value)) for value in target.shape)
@@ -317,16 +336,25 @@ def evaluate_saved_prediction(cache: Path, case_id: str, output: Path) -> dict:
     return result
 
 
+def evaluation_device():
+    """Production CUDA device; a CPU device can be injected in offline tests."""
+    return torch.device("cuda")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--session", type=Path, required=True)
     parser.add_argument("--model", choices=["B0", "A", "B"], required=True)
     parser.add_argument("--development", action="store_true")
+    parser.add_argument("--checkpoint", type=Path)
+    parser.add_argument("--surface-voxel-limit", type=int, default=SURFACE_VOXEL_LIMIT)
     args = parser.parse_args()
+    if args.surface_voxel_limit < 0:
+        raise ValueError("surface-voxel-limit must be nonnegative")
     config = json.loads(args.config.read_text())
     cohort = json.loads((args.session / "cohort.json").read_text())
-    checkpoint = (
+    checkpoint = args.checkpoint or (
         Path(config["base_checkpoint"]) if args.model == "B0"
         else args.session / f"arm_{args.model}" / "best.checkpoint.pt"
     )
@@ -335,70 +363,117 @@ def main() -> int:
     cache = Path(config["training_cache"] if args.development else config["evaluation_cache"])
     output = args.session / "evaluation" / label / args.model
     output.mkdir(parents=True, exist_ok=True)
-    summary_path = output / "summary.json"
-    summary = {
-        "schema_version": "shadowtrainer.stunet-evaluation/v1",
-        "status": "running", "model": args.model, "cohort": label,
-        "cases_requested": cases, "checkpoint": str(checkpoint),
-        "checkpoint_sha256": sha256_file(checkpoint), "started_at": time.time(),
-    }
-    atomic_json(summary_path, summary)
-    handles = []
-    try:
-        if shutil.disk_usage("/mnt/c").free < 20 * GIB + 512 * MIB:
-            raise RuntimeError("evaluation disk reservation failed")
-        memory = psutil.virtual_memory()
-        if memory.available < int(1.5 * GIB) or psutil.swap_memory().used > 192 * MIB:
-            raise RuntimeError("evaluation memory guard failed")
-        torch.manual_seed(config["seed"])
-        torch.cuda.manual_seed_all(config["seed"])
-        torch.backends.cudnn.benchmark = False
-        torch.backends.cudnn.deterministic = True
-        torch.use_deterministic_algorithms(True, warn_only=True)
-        device = torch.device("cuda")
-        model, _stack, handles, stages = build_model("WORKSPACE_AWARE_HYBRID_V2", device)
-        payload = torch.load(checkpoint, map_location=device, weights_only=False)
-        model.load_state_dict(payload["model_state"])
-        # The checkpoint state dict is no longer needed after loading. Keeping
-        # it alongside the model and volume buffers breaks the RSS budget on
-        # the largest independent cases.
-        del payload
-        gc.collect()
-        model.eval()
-        rows = []
+    # One evaluator per output; check receipts BEFORE touching old summaries/GPU.
+    with (output / '.evaluation.lock').open('a') as run_lock:
+        fcntl.flock(run_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        checkpoint_digest = sha256_file(checkpoint)
+        protocol = {
+            'version': 'stunet-eval/v6-bounded-surface-metrics', 'patch': 128, 'stride': 64,
+            'surface_voxel_limit': args.surface_voxel_limit,
+            'seed': config['seed'], 'cohort': label, 'aggregation': 'mean-softmax-argmax',
+            'torch': str(torch.__version__), 'numpy': np.__version__, 'nibabel': nib.__version__,
+            'cuda': torch.version.cuda, 'python': sys.version,
+            'code': {name: sha256(path) for name, path in {
+                'evaluator': Path(__file__), 'provenance': SHADOW / 'research/prediction_provenance.py',
+            'geometry': SHADOW / 'research/audit_development_masks.py',
+            'decoded_cache': SHADOW / 'research/decoded_volume_cache.py',
+                'full_volume': ROOT / 'experiments/stage32/full_volume.py',
+                'model_builder': ROOT / 'kits23_mini_worker.py',
+            }.items()},
+        }
+        bindings = {}
         for case_id in cases:
-            saved_prediction = output / "predictions" / f"{case_id}.nii.gz"
-            if saved_prediction.exists():
-                row = evaluate_saved_prediction(cache, case_id, output)
-            else:
-                row = evaluate_case(model, device, cache, case_id, output)
-            rows.append(row)
-            summary["cases"] = rows
-            atomic_json(summary_path, summary)
-        summary.update({
-            "status": "success", "finished_at": time.time(),
-            "duration_seconds": time.time() - summary["started_at"],
-            "aggregate": aggregate_rows(rows), "structural_stages": stages,
-            "gpu": torch.cuda.get_device_name(0),
-            "peak_allocated_mib": max(row["peak_allocated_mib"] for row in rows),
-            "peak_reserved_mib": max(row["peak_reserved_mib"] for row in rows),
-            "peak_rss_mib": max(row["peak_rss_mib"] for row in rows),
-        })
-    except Exception as exc:
-        summary.update({
-            "status": "error", "error": repr(exc),
-            "traceback": traceback.format_exc(), "failed_at": time.time(),
-        })
-    finally:
-        for handle in handles:
-            try:
-                handle.remove()
-            except Exception:
-                pass
+            bindings[case_id] = binding(checkpoint_digest, cache / case_id / 'imaging.nii.gz',
+                                        cache / case_id / 'segmentation.nii.gz', protocol)
+            saved = output / 'predictions' / f'{case_id}.nii.gz'
+            if saved.exists():
+                verify(saved, bindings[case_id])
+        summary_path = output / "summary.json"
+        summary = {
+            "schema_version": "shadowtrainer.stunet-evaluation/v1",
+            "status": "running", "model": args.model, "cohort": label,
+            "cases_requested": cases, "checkpoint": str(checkpoint),
+            "checkpoint_sha256": checkpoint_digest, "protocol": protocol, "started_at": time.time(),
+        }
         atomic_json(summary_path, summary)
-    print(json.dumps(summary, indent=2))
-    return 0 if summary.get("status") == "success" else 1
-
+        handles = []
+        try:
+            if shutil.disk_usage("/mnt/c").free < 20 * GIB + 512 * MIB:
+                raise RuntimeError("evaluation disk reservation failed")
+            memory = psutil.virtual_memory()
+            if memory.available < int(1.5 * GIB) or psutil.swap_memory().used > 192 * MIB:
+                raise RuntimeError("evaluation memory guard failed")
+            torch.manual_seed(config["seed"])
+            torch.cuda.manual_seed_all(config["seed"])
+            torch.backends.cudnn.benchmark = False
+            torch.backends.cudnn.deterministic = True
+            torch.use_deterministic_algorithms(True, warn_only=True)
+            device = evaluation_device()
+            model, _stack, handles, stages = build_model("WORKSPACE_AWARE_HYBRID_V2", device)
+            payload = load_checkpoint_safely(checkpoint, map_location="cpu")
+            if sha256_file(checkpoint) != checkpoint_digest:
+                raise ValueError('checkpoint changed during load')
+            model.load_state_dict(payload["model_state"])
+            # The checkpoint state dict is no longer needed after loading. Keeping
+            # it alongside the model and volume buffers breaks the RSS budget on
+            # the largest independent cases.
+            del payload
+            gc.collect()
+            model.eval()
+            rows = []
+            for case_id in cases:
+                saved_prediction = output / "predictions" / f"{case_id}.nii.gz"
+                expected = bindings[case_id]
+                current = binding(checkpoint_digest, cache / case_id / 'imaging.nii.gz',
+                                  cache / case_id / 'segmentation.nii.gz', protocol)
+                if current != expected:
+                    raise ValueError('source changed after preflight')
+                if saved_prediction.exists():
+                    verify(saved_prediction, expected)
+                    row = evaluate_saved_prediction(
+                        cache, case_id, output,
+                        surface_voxel_limit=args.surface_voxel_limit,
+                    )
+                else:
+                    row = evaluate_case(model, device, cache, case_id, output,
+                                        expected['image_sha256'],
+                                        surface_voxel_limit=args.surface_voxel_limit)
+                    if binding(checkpoint_digest, cache / case_id / 'imaging.nii.gz',
+                               cache / case_id / 'segmentation.nii.gz', protocol) != expected:
+                        raise ValueError('source changed during inference; prediction left unsealed')
+                    seal(saved_prediction, expected)
+                    evict(output.parents[2] / 'decoded_cache', expected['image_sha256'])
+                if binding(checkpoint_digest, cache / case_id / 'imaging.nii.gz',
+                           cache / case_id / 'segmentation.nii.gz', protocol) != expected:
+                    raise ValueError('source changed during evaluation')
+                verify(saved_prediction, expected)
+                row['provenance_verified'] = True
+                rows.append(row)
+                summary["cases"] = rows
+                atomic_json(summary_path, summary)
+            summary.update({
+                "status": "success", "finished_at": time.time(),
+                "duration_seconds": time.time() - summary["started_at"],
+                "aggregate": aggregate_rows(rows), "structural_stages": stages,
+                "gpu": torch.cuda.get_device_name(0),
+                "peak_allocated_mib": max(row["peak_allocated_mib"] for row in rows),
+                "peak_reserved_mib": max(row["peak_reserved_mib"] for row in rows),
+                "peak_rss_mib": max(row["peak_rss_mib"] for row in rows),
+            })
+        except Exception as exc:
+            summary.update({
+                "status": "error", "error": repr(exc),
+                "traceback": traceback.format_exc(), "failed_at": time.time(),
+            })
+        finally:
+            for handle in handles:
+                try:
+                    handle.remove()
+                except Exception:
+                    pass
+            atomic_json(summary_path, summary)
+        print(json.dumps(summary, indent=2))
+        return 0 if summary.get("status") == "success" else 1
 
 if __name__ == "__main__":
     raise SystemExit(main())

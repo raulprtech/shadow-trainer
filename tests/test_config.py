@@ -60,3 +60,32 @@ def test_v2_requires_sealed_provenance(tmp_path):
     path.write_text(json.dumps(payload))
     with pytest.raises(ConfigurationError, match="provenance"):
         JobConfig.load(path)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("execution_split", "locked_test"),
+    ("execution_split", "test"),
+    ("experiment_id", "another-job"),
+    ("experiment_digest", "not-a-digest"),
+    ("manifest_sha256", "b" * 63),
+    ("bridge_version", ""),
+    ("unrecognized_field", "unexpected"),
+])
+def test_v2_rejects_invalid_clinical_provenance(tmp_path, field, value):
+    path = write_job(tmp_path)
+    payload = json.loads(path.read_text())
+    payload["schema_version"] = "shadowtrainer.job/v2"
+    payload["provenance"] = {
+        "schema_version": "clinical-nigma.shadow-provenance/v1",
+        "bridge_version": "2",
+        "experiment_id": payload["job_id"],
+        "experiment_digest": "a" * 64,
+        "execution_split": "development",
+        "split_ref": "split://synthetic/development/v1",
+        "manifest_sha256": "b" * 64,
+        "variant_id": "synthetic-fixture-v1",
+    }
+    payload["provenance"][field] = value
+    path.write_text(json.dumps(payload))
+    with pytest.raises(ConfigurationError, match="provenance"):
+        JobConfig.load(path)

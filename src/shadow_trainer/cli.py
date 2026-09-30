@@ -9,7 +9,7 @@ from pathlib import Path
 
 from . import __version__
 from .config import JobConfig
-from .demo import run_demo
+from .demo import prepare_demo, run_demo
 from .errors import ShadowTrainerError
 from .pair_analysis import summarize_pair_matrix
 from .pair_audit import audit_pair
@@ -41,6 +41,8 @@ def _parser() -> argparse.ArgumentParser:
     demo = commands.add_parser("demo", help="run the portable local 3D-CNN demo")
     demo.add_argument("--output-dir", required=True, type=Path)
     demo.add_argument("--cpu", action="store_true", help="allow a CPU-only demonstration")
+    demo.add_argument("--prepare-only", action="store_true",
+                      help="write a guarded local fixture/job without starting training")
     benchmark = commands.add_parser("benchmark", help="build canonical scientific evidence from audited runs")
     benchmark.add_argument("evidence_spec", type=Path)
     benchmark.add_argument("--output-dir", required=True, type=Path)
@@ -94,6 +96,10 @@ def main(argv: list[str] | None = None) -> int:
             print(render_report(args.run_dir))
             return 0
         if args.command == "demo":
+            if args.prepare_only:
+                path = prepare_demo(args.output_dir, use_cuda=not args.cpu)
+                print(json.dumps({"status": "prepared_not_executed", "job_config": str(path)}))
+                return 0
             result = run_demo(args.output_dir, use_cuda=not args.cpu)
             print(json.dumps(result, indent=2, sort_keys=True))
             print(f"Report: {(args.output_dir / 'run' / 'report.html').resolve()}")

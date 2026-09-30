@@ -1,5 +1,7 @@
 # Pitch de ocho láminas
 
+Material histórico. Para la revisión actual usar [pitch actualizado](circuito14-review-2026-09-20/pitch.md) y su HTML offline; el conteo antiguo de pruebas abajo no es vigente.
+
 ## 1. Un laboratorio mayor que su hardware
 
 Los modelos y datasets crecen más rápido que la VRAM y el almacenamiento local.

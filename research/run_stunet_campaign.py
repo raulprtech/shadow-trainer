@@ -8,9 +8,8 @@ HERE=Path(__file__).resolve().parent
 SHADOW=HERE.parent
 LAB=Path("/home/raulprtech/stream-hot-kits-mini")
 sys.path[:0]=[str(HERE),str(LAB)]
-from stage23_bounded_nifti import BoundedWindowStager
-from stage34_resilient_staging import ProgressAwareRcloneSource
 from stunet_campaign import atomic_json,csv_case_ids,manifest_records,prior_used_cases,record_bytes,select_evaluation_cases,sha256_file
+from campaign_epoch_plan import frozen_epochs
 GIB=2**30;MIB=2**20
 
 def snapshot(pid=None):
@@ -26,9 +25,9 @@ def snapshot(pid=None):
             "available_ram_bytes":memory.available,"swap_used_bytes":swap.used,
             "process_tree_rss_bytes":rss}
 
-def failures(state,startup=False,swap_limit=256*MIB):
+def failures(state,startup=False,swap_limit=256*MIB,startup_reserve_bytes=5*GIB):
     result=[]
-    if state["disk_free_bytes"]<20*GIB+(5*GIB if startup else 0):result.append("physical_disk_floor")
+    if state["disk_free_bytes"]<20*GIB+(startup_reserve_bytes if startup else 0):result.append("physical_disk_floor")
     if state["available_ram_bytes"]<(5*GIB if startup else 512*MIB):result.append("available_ram_floor")
     if state["swap_used_bytes"]>swap_limit:result.append("swap_limit")
     if state["process_tree_rss_bytes"]>int(4.5*GIB):result.append("process_tree_rss_limit")
@@ -47,7 +46,9 @@ def directory_bytes(path):
     return sum(item.stat().st_size for item in Path(path).rglob("*") if item.is_file())
 
 def preflight(config,require_remote=True,startup=True):
-    state=snapshot();issues=failures(state,startup=startup)
+    state=snapshot();issues=failures(
+        state,startup=startup,
+        startup_reserve_bytes=int(config.get("campaign_artifact_ceiling_bytes",5*GIB)))
     paths=[Path(config[key]) for key in ("manifest","base_checkpoint","train_csv","validation_csv","cache_seed","stage34_schedule")]
     for path in paths:
         if not path.exists():issues.append(f"missing:{path}")
@@ -93,6 +94,10 @@ def build_cohort(config):
             "independent_evaluation":len(evaluation)>=4}
 
 def stage_evaluation(config,cohort,events):
+    # Historical staging is required only for an actual laboratory campaign,
+    # not for importing/testing planning helpers in the standalone MVP.
+    from stage23_bounded_nifti import BoundedWindowStager
+    from stage34_resilient_staging import ProgressAwareRcloneSource
     raw=load_json(config["manifest"])
     sizes={row[kind]["source"]:row[kind]["size_bytes"] for row in raw["cases"] for kind in ("image","label")}
     source=ProgressAwareRcloneSource(config["remote"],sizes,"/mnt/c",20*GIB,attempts=3,
@@ -105,7 +110,8 @@ def stage_evaluation(config,cohort,events):
     with Path(events).open("a") as stream:stream.write(json.dumps({"kind":"evaluation_staged",**result})+"\n")
     return result
 
-def run_guarded(command,cwd,log,resources,deadline,phase_deadline,swap_limit=256*MIB):
+def run_guarded(command,cwd,log,resources,deadline,phase_deadline,swap_limit=256*MIB,
+                combined_artifact_root=None,combined_artifact_ceiling=None):
     env=dict(os.environ,OMP_NUM_THREADS="2",MKL_NUM_THREADS="2",
              PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True")
     started=time.time();status="running";reasons=[];sample_index=0;session=Path(log).parent
@@ -116,6 +122,10 @@ def run_guarded(command,cwd,log,resources,deadline,phase_deadline,swap_limit=256
                 state=snapshot(process.pid);samples.write(json.dumps(state)+"\n");samples.flush()
                 reasons=failures(state,swap_limit=swap_limit);sample_index+=1
                 if sample_index%10==0 and directory_bytes(session)>5*GIB:reasons.append("campaign_artifact_ceiling")
+                if (sample_index%10==0 and combined_artifact_root is not None
+                        and combined_artifact_ceiling is not None
+                        and directory_bytes(Path(combined_artifact_root))>combined_artifact_ceiling):
+                    reasons.append("combined_artifact_ceiling")
                 if time.time()>=min(deadline,phase_deadline):reasons.append("time_budget")
                 if reasons:status="guard_stopped";stop_group(process);break
                 try:process.wait(timeout=2)
@@ -269,8 +279,9 @@ def main():
             if result["status"]!="success":raise RuntimeError("pilot failed")
         median=training_step_median(session/"pilot_A"/"metrics.jsonl")
         projected=median*24*8*4*2*1.5
-        epochs=4 if time.time()+projected+3*3600<deadline else 2
-        state["epochs_selected"]=epochs;state["pilot_step_median_seconds"]=median;save_state()
+        proposed_epochs=4 if time.time()+projected+3*3600<deadline else 2
+        epochs=frozen_epochs(state,session,proposed_epochs)
+        state["pilot_step_median_seconds"]=median;save_state()
         training_deadline=min(deadline,active_deadline(4.75))
         for arm in ("A","B"):
             phase=f"train_{arm}"

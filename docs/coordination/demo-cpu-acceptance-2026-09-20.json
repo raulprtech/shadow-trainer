@@ -1,0 +1,112 @@
+{
+  "schema_version": "shadowtrainer.demo-acceptance/v1",
+  "scope": "local_synthetic_cpu_only",
+  "runs": {
+    "demo-cpu-acceptance-r1": {
+      "status": "success",
+      "steps": 12,
+      "steps_unique": true,
+      "losses_and_gradients_finite": true,
+      "strategy": "sync",
+      "cache_peak_observed_bytes": 4096,
+      "cache_budget_bytes": 4096,
+      "session_bytes": 49547,
+      "artifacts": {
+        "environment.json": {
+          "bytes": 1147,
+          "sha256": "d7490a81dd731fb613061a6f6d8740a6454f6b0c327ba019465d60dfd9d59b2e"
+        },
+        "events.jsonl": {
+          "bytes": 7128,
+          "sha256": "efe63631b31b38f03b845b23cc414d5e3871c7baedb9622a79cb79fe7f564d10"
+        },
+        "job.json": {
+          "bytes": 1191,
+          "sha256": "231dac39da4461f8dead194804cdedd0579186287adec7d0c0f06eccce8dc8b7"
+        },
+        "latest.checkpoint.pt": {
+          "bytes": 16667,
+          "sha256": "599dd99330e29673efda633fece36f6f384540412b112a38a2bca372239cf887"
+        },
+        "plan.json": {
+          "bytes": 261,
+          "sha256": "92d1e708fca5c9bed4be9ee1eea23e4bab22811edf6ee2d34401bce6ad34a96d"
+        },
+        "report-summary.json": {
+          "bytes": 180,
+          "sha256": "c2159e4096ac1b1281d04a331af34d829bf91f1d4cf0cfb6305a461880c087b0"
+        },
+        "report.html": {
+          "bytes": 6039,
+          "sha256": "ecab63e9fece9b60fcab15ceee62bd2d019cf2f8112efd52529f3e375c3059be"
+        },
+        "summary.json": {
+          "bytes": 643,
+          "sha256": "837e269d7853a871b8608fde5952c3af7e323de9ac02fc3a34b1040165e7d060"
+        }
+      }
+    },
+    "demo-cpu-recovery-r1": {
+      "status": "success",
+      "steps": 12,
+      "steps_unique": true,
+      "losses_and_gradients_finite": true,
+      "strategy": "sync",
+      "cache_peak_observed_bytes": 4096,
+      "cache_budget_bytes": 4096,
+      "session_bytes": 50042,
+      "artifacts": {
+        "environment.json": {
+          "bytes": 1149,
+          "sha256": "74e5c4aaa48bef812acc3ad99c3b52b47a553780722e78cd36af2ed05541a0bd"
+        },
+        "events.jsonl": {
+          "bytes": 7631,
+          "sha256": "24fa6fcb0efae2856afa6c10d9d8ec5fb2d2488fc4febfd12f12a894bbe653c0"
+        },
+        "job.json": {
+          "bytes": 1183,
+          "sha256": "4587a1dbed3081d40cdea3dfa9d6500285832ef012da5e14e4756400ec01f61a"
+        },
+        "latest.checkpoint.pt": {
+          "bytes": 16667,
+          "sha256": "35adf98aa8a96630b6fbc05bd10bf93e683e063380b746f96c345a832e363e38"
+        },
+        "plan.json": {
+          "bytes": 261,
+          "sha256": "92d1e708fca5c9bed4be9ee1eea23e4bab22811edf6ee2d34401bce6ad34a96d"
+        },
+        "report-summary.json": {
+          "bytes": 180,
+          "sha256": "c2159e4096ac1b1281d04a331af34d829bf91f1d4cf0cfb6305a461880c087b0"
+        },
+        "report.html": {
+          "bytes": 6043,
+          "sha256": "3db5dfdd5e58b7f4c75264f86ff5b83fd63405c28a2e2a9c536082cc5f41b967"
+        },
+        "summary.json": {
+          "bytes": 645,
+          "sha256": "e4e741fd0d672c1787c7622003713b9f9331bef513a7df1431ed28f8e87a2f98"
+        }
+      }
+    }
+  },
+  "recovery": {
+    "interrupted_at_step": 2,
+    "final_step": 12,
+    "workload_state_exact": true,
+    "components": [
+      "model",
+      "optimizer",
+      "python_rng",
+      "torch_rng"
+    ],
+    "state_sha256": "d9cec2c6c337335dfd85330ffd76fe25bc9cddc43739bb51ef8cfec11fa0da49"
+  },
+  "limits": [
+    "Not a GPU validation",
+    "Not a long STU-Net gate",
+    "No clinical utility claim",
+    "Host resources are sampled, not continuous external monitoring"
+  ]
+}

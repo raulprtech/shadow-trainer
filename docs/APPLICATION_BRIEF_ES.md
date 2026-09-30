@@ -1,5 +1,7 @@
 # Shadow Trainer — descripción ejecutiva para Circuito 14
 
+Para el borrador vigente de postulación ver [resumen ejecutivo de revisión](circuito14-review-2026-09-20/executive-brief.md). Este documento conserva el contexto y las cifras históricas; no sustituye la revisión humana de equipo, afiliación, IP y mercado.
+
 ## Problema
 
 Los equipos de ingeniería AI/edge trabajan con modelos, workspaces temporales y
@@ -29,7 +31,13 @@ Trainer no se presenta como dispositivo ni solución clínica.
 - Estrategias experimentales separadas de las habilitadas por defecto.
 - Reporte legible y trazabilidad de resultados negativos.
 
-## Validación actual comprobable
+## Validación histórica comprobable del MVP compacto
+
+Estas cifras corresponden al corte original del MVP, no a una nueva ejecución
+ni al conteo actual de pruebas. Para afirmaciones vigentes prevalece el
+[ledger canónico](../research/CLAIMS_LEDGER.md). La matriz física posterior
+aportó 24 pares exactos de fixtures; no cierra el gate largo STU-Net ni demuestra
+aceleración universal. No se ha demostrado un workload o piloto EDA.
 
 - Ejecución física en NVIDIA RTX 3050 Ti Laptop de 4096 MiB.
 - Demo de producto de 12 pasos finalizada en 2.32 segundos.
@@ -38,7 +46,7 @@ Trainer no se presenta como dispositivo ni solución clínica.
 - Caché física de 128 MiB con 83,549,098 bytes ocupados.
 - Guarda de disco observando el espacio real de C: mediante /mnt/c.
 - Calibraciones físicas ResNet18 y ResNet50 2.5D proxy con 258 y 488 MiB de VRAM reservada.
-- Suite automatizada: 30 pruebas aprobadas, incluida equivalencia exacta de reanudación para Tiny3D.
+- Suite automatizada del corte original: 30 pruebas aprobadas, incluida equivalencia exacta de reanudación para Tiny3D; no reejecutadas para esta actualización documental.
 
 Estas cifras describen el MVP compacto. Las calibraciones ResNet son pruebas
 de integración, no comparaciones de velocidad o calidad predictiva. Los resultados de STU-Net del

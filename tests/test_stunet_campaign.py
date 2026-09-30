@@ -98,3 +98,14 @@ def test_five_gib_ram_floor_applies_only_to_initial_start():
     }
     assert "available_ram_floor" in failures(state, startup=True)
     assert "available_ram_floor" not in failures(state, startup=False)
+
+
+def test_startup_disk_reserve_can_follow_a_smaller_campaign_ceiling():
+    gib = 2 ** 30
+    state = {
+        "disk_free_bytes": 23 * gib, "available_ram_bytes": 6 * gib,
+        "swap_used_bytes": 0, "process_tree_rss_bytes": 0,
+    }
+    assert "physical_disk_floor" in failures(state, startup=True)
+    assert "physical_disk_floor" not in failures(
+        state, startup=True, startup_reserve_bytes=2 * gib)

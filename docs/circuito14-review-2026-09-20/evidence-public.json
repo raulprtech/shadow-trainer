@@ -1,0 +1,25 @@
+{
+  "schema": "shadowtrainer.presentation-evidence/v1",
+  "classification": "review_draft_not_submitted",
+  "workload": "synthetic Tiny3D",
+  "device": "RTX 3050 Ti Laptop GPU, 4 GiB",
+  "physical_gpu_steps": 12,
+  "strategy": "sync",
+  "tests": {
+    "passed": 65,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "locked_dependencies": 38,
+  "peak_gpu_reserved_mib": 22,
+  "cache_budget_bytes": 4096,
+  "source_acceptance_sha256": "2ebabd5fa57038c3d226854ce637186a09e1820e0d49fec976bfdae1900a438b",
+  "limits": [
+    "Validated on one workstation",
+    "New GPU demo uninterrupted; CPU recovery evidence separate",
+    "Not clinical validation",
+    "No demonstrated industrial or EDA pilot",
+    "Long STU-Net prefetch gate pending"
+  ]
+}
