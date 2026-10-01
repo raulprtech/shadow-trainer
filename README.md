@@ -31,6 +31,12 @@ https://github.com/raulprtech/shadow-trainer. `src/shadow_trainer/` contains
 the product runtime, `research/` the experimental supervisors, `tests/` their
 checks, and `docs/` the supporting documentation.
 
+Public presentation demo:
+https://ia-local-circuito14-demo.raulavenger21.chatgpt.site. It replays saved
+synthetic GPU events and presents separate aggregate STU-Net evidence; it
+does not run training in the browser. See docs/PUBLIC_DEMO_20260930.md for
+the presenter guide and offline copy.
+
 Datasets, checkpoints, virtual environments, caches, detailed case-level
 receipts and application documents remain local. Some historical experiment
 configs contain workstation-specific paths; they document those experiments
